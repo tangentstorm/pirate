@@ -557,6 +557,17 @@ class PirateVisitor(object):
 
     ##[ assignment ]################################################
 
+    def assign(self, node, value):
+        """
+        dispatch method for name/property/subscript
+        """
+        method = {
+            ast.Subscript: self.assignToSubscript,
+            ast.AssAttr: self.assignToProperty,
+            ast.AssName: self.assignToName,
+            }[node.__class__]
+        method(node, value)
+
     def assignToSubscript(self, node, value):
         slot = self.expressSubscript(node, dest=None, allocate=0)
         self.append("%(slot)s = %(value)s" % locals())
@@ -578,15 +589,11 @@ class PirateVisitor(object):
             self.append("store_lex -1, '%(name)s', %(value)s" % locals())
 
 
-    def assign(self, node, value):
-        if isinstance(node, ast.Subscript):
-            self.assignToSubscript(node, value)
-        elif isinstance(node, ast.AssAttr):
-            self.assignToProperty(node, value)
-        else:
-            self.assignToName(node, value)
-
     def evaluate(self, expr):
+        """
+        stores an expression in a P-register and
+        return a symbol for that register.
+        """
         value = self.symbol("value")
         self.append(".local object %(value)s" % locals())
         self.compileExpression(expr, value)
