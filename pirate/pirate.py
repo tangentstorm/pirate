@@ -72,6 +72,8 @@ class PirateVisitor(object):
         self.reachable = True
         self.types = {}
         self.locals = {}
+        self.seen_labels = []
+        self.pending_unless = None
 
     def gensym(self, prefix="$P", type="object"):
         """
@@ -117,17 +119,39 @@ class PirateVisitor(object):
 
 
     def append(self, line, indent=True):
+        if self.pending_unless:
+            self.seen_labels.append(self.pending_unless[1])
+            self.lines.append("unless %s goto %s" % self.pending_unless)
+            self.pending_unless = None
         if self.reachable:
             self.lines.append(line, indent)
 
-    def unappend(self):
-        self.lines.pop()
-        
-    def label(self, name):
+    def label(self, name, optional=False):
+        if self.pending_unless:
+            if self.pending_unless[1]!=name:
+                self.seen_labels.append(self.pending_unless[1])
+                self.append("unless %s goto %s" % self.pending_unless)
+            self.pending_unless = None
+        if optional and not name in self.seen_labels: return
         self.reachable = True
         self.append("%s:" % name, indent=False)
         self.types = {}
         self.locals = {}
+
+    def unless(self, expression, label):
+        if self.pending_unless:
+            self.seen_labels.append(self.pending_unless[1])
+            self.append("unless %s goto %s" % self.pending_unless)
+        self.pending_unless = (expression, label)
+
+    def goto(self, label):
+        self.seen_labels.append(label)
+        if self.pending_unless:
+            cond = self.pending_unless[0]
+            self.pending_unless = None
+            self.append("if %s goto %s" % (cond, label))
+        else:
+            self.append("goto " + label)
 
     def bindLocal(self, name, value):
         self.locals[name] = value
@@ -420,6 +444,8 @@ class PirateVisitor(object):
         "==": "iseq",
         ">":  "isgt",
         ">=": "isge",
+        "is": "==",
+        "is not": "!=",
     }
 
     def unlessExpression(self, test, label):
@@ -429,24 +455,24 @@ class PirateVisitor(object):
 
             op, code = test.ops[0]
             if op=="is": op="=="
+            if op=="is not": op="!="
             if op=="<>": op="!="
         
             if op<>"in":
                 symL = self.compileExpression(test.expr, allocate=1)
                 symR = self.compileExpression(code)
-                self.append("unless %s %s %s goto %s" % (symL, op, symR, label))
+                self.unless("%s %s %s" % (symL, op, symR), label)
             else:
                 testvar = self.compileExpression(test)
-                self.append("unless %s goto %s" % (testvar, label))
+                self.unless(testvar, label)
 
         elif isinstance(test, ast.Const):
             if not test.value: 
-                self.append("goto %s" % label)
-                self.reachable=False
+                self.goto(label)
 
         else:
             testvar = self.compileExpression(test)
-            self.append("unless %s goto %s" % (testvar, label))
+            self.unless(testvar, label)
         
     def compareExpression(self, expr, allocate):
         assert len(expr.ops) == 1, "@TODO: multi-compare not working yet"
@@ -456,7 +482,6 @@ class PirateVisitor(object):
 
         # get the op:
         op, code = expr.ops[0]
-        if op=="is": op="=="
         
         # get right side:
         symR = self.compileExpression(code, allocate=1)
@@ -467,19 +492,11 @@ class PirateVisitor(object):
             temp = self.gensym("$I")
             self.append("%s %s, %s, %s" % (self.compOps[op], temp, symL, symR))
             self.append("%s = %s" % (dest, temp))
-        elif op=="in":
+        else:
+            assert op=="in"
             temp = self.gensym("$I")
             self.append("exists %s, %s[%s]" % (temp, symR, symL))
             self.append("%s = %s" % (dest, temp))
-        else:
-            _cmp = self.genlabel("cmp")
-            _end = self.genlabel("endcmp")
-            self.append("if %s %s %s goto %s" % (symL, op, symR, _cmp))
-            self.append("%s = 0" % dest)
-            self.append("goto %s" % _end)
-            self.label(_cmp)
-            self.append("%s = 1" % dest)
-            self.label(_end)
 
         return dest
 
@@ -521,7 +538,7 @@ class PirateVisitor(object):
                 self.append("%s = %s" % (temp, upper))
                 upper = temp
 
-        return "%s .. %s" % (lower, upper)
+        return "%s .. %s" % (lower or "0", upper)
 
     def visitSlice(self, node):
         assert node.flags == "OP_DELETE"
@@ -746,16 +763,16 @@ class PirateVisitor(object):
             # do it and goto _endif
             self.visit(body)
             if _elif <> _endif:
-                self.append("goto " + _endif)
+                self.goto(_endif)
             
             # _elif: (next test or pass through to else)
-            self.label(_elif)
+            self.label(_elif, optional=True)
 
         # else:
         if node.else_:
             self.set_lineno(node.else_)
             self.visit(node.else_)
-            self.append(_endif + ":")
+            self.label(_endif, optional=True)
 
 
     ##[ assignment ]################################################
@@ -906,15 +923,15 @@ class PirateVisitor(object):
         if node.else_:
             self.unlessExpression(node.test, _elsewhile)
             self.visit(node.body)
-            self.append("goto " + _while)
-            self.label(_elsewhile)
+            self.goto(_while)
+            self.label(_elsewhile, optional=True)
             self.visit(node.else_)
         else:
             self.unlessExpression(node.test, _endwhile)
             self.visit(node.body)
-            self.append("goto " + _while)
+            self.goto(_while)
 
-        self.label(_endwhile)
+        self.label(_endwhile, optional=True)
         self.loops.pop()
 
 
@@ -935,7 +952,7 @@ class PirateVisitor(object):
         # get the next item (also where "continue" jumps to)
         item = self.gensym()
         self.label(_for)
-        self.append("unless %s goto %s" % (iter, _elsefor))
+        self.unless(iter, _elsefor)
         self.append("%s = shift %s" % (item, iter))
 
         if isinstance(node.assign, ast.AssTuple):
@@ -951,30 +968,28 @@ class PirateVisitor(object):
         self.visit(node.body)
 
         # loop
-        self.append("goto " + _for)
+        self.goto(_for)
 
         # else: this is where we go if the loop ends with no "break"
         self.loops.pop() # no longer part of the loop
         if node.else_:
-            self.label(_elsefor)
+            self.label(_elsefor, optional=True)
             self.visit(node.else_)
             
         # end
-        self.label(_endfor)
+        self.label(_endfor, optional=True)
         
 
 
 
     def visitBreak(self, node):
         assert self.loops, "break outside of loop" # SyntaxError
-        self.append("goto %s" % self.loops[-1][1])
-        self.reachable = False
+        self.goto(self.loops[-1][1])
 
 
     def visitContinue(self, node):
         assert self.loops, "continue outside of loop" # SyntaxError
-        self.append("goto %s" % self.loops[-1][0])
-        self.reachable = False
+        self.goto(self.loops[-1][0])
 
 
     def visitCallFunc(self, node):
@@ -1050,14 +1065,14 @@ class PirateVisitor(object):
         self.append("set_eh " + handler)
         self.visit(node.body)
         self.append("clear_eh")
-        self.append("goto " + endtry)
+        self.goto(endtry)
         self.label(catch)
         for hand in node.handlers:
             expr, target, body = hand
             assert not (expr or target), \
                    "@TODO: can't get exception object yet"
             self.visit(body)
-        self.label(endtry)
+        self.label(endtry, optional=True)
 
                 
         
@@ -1140,7 +1155,7 @@ class PirateSubVisitor(PirateVisitor):
 
         if self.emptyReturn:
             fallthru = True
-            self.label(self.emptyReturn)
+            self.label(self.emptyReturn, optional=True)
 
         if fallthrou:
             dest = self.gensym()
@@ -1178,7 +1193,7 @@ class PirateSubVisitor(PirateVisitor):
 
         if self.emptyReturn:
             fallthru = True
-            self.label(self.emptyReturn)
+            self.label(self.emptyReturn, optional=True)
 
         if fallthrou:
             stop = ast.Raise(ast.Const("StopIteration"), None, None)
@@ -1204,7 +1219,7 @@ class PirateSubVisitor(PirateVisitor):
     def visitReturn(self, node):
         if isinstance(node.value,ast.Const) and node.value.value == None:
             self.emptyReturn = self.genlabel("return")
-            self.append("goto %s" % self.emptyReturn)
+            self.goto(self.emptyReturn)
         else:
             result = self.compileExpression(node.value, allocate=1)
             self.append("pop_pad")
