@@ -341,7 +341,7 @@ class PirateTest(unittest.TestCase):
     ## amk's example program #####################
 
     def test_euclid(self):
-        res = pirate.invoke(open("euclid.py").read(), dump=0)
+        res = pirate.invoke(open("benchmarks/euclid.py").read(), dump=0)
         self.assertEquals(res, "96 64\n32\n")
 
 
