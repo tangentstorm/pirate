@@ -60,6 +60,11 @@ class PirateVisitor:
         #compiler.ast.LeftShift: '<<',    # untested
     }
 
+    logicOps = {
+        compiler.ast.And: '&&',
+        compiler.ast.Or: '||',
+    }
+
     def expression(self, expr, dest):
         """
         create code to eval expression Node 'expr' and put it in 'dest'
@@ -69,35 +74,43 @@ class PirateVisitor:
         elif isinstance(expr, compiler.ast.Const):
             return ["%s = %s" % (dest, repr(expr.value))]
         elif isinstance(expr, tuple(self.infixOps.keys())):
-            operator = self.infixOps[expr.__class__]
-            symleft,  typleft  = self.symbol("$P"), "PerlInt"
-            symright, typright = self.symbol("$P"), "PerlInt"
-            symexpr,  typexpr  = self.symbol("$P"), "PerlInt"
-            res = []
-            
-            # store left side of expression in symleft:
-            res.append("%s = new %s" % (symleft, typleft))
-            res.extend(self.expression(expr.left, symleft))
-            
-            # store right side of expression in symright:
-            res.append("%s = new %s" % (symright, typright))
-            res.extend(self.expression(expr.right, symright))
-
-            # store the combined value in symexpr
-            res.append("%s = new %s" % (symexpr, typexpr))
-            res.append("%s = %s %s %s" \
-                       % (symexpr, symleft, operator, symright))
-
-            # and finally put the result in our destination
-            # (imcc seems to like this as a separate step for
-            # typecasting or something...)
-            res.append("%s = %s" % (dest, symexpr))
-            return res
+            return self.infixExpression(expr, dest)
         else:
+            print
+            print
             print "*** UNKNOWN EXPRESSION ****"
             print "*** entering debugger ****"
+            print
+            print
             import pdb; pdb.set_trace()
+            
         
+    def infixExpression(self, expr, dest):
+        operator = self.infixOps[expr.__class__]
+        symleft,  typleft  = self.symbol("$P"), "PerlInt"
+        symright, typright = self.symbol("$P"), "PerlInt"
+        symexpr,  typexpr  = self.symbol("$P"), "PerlInt"
+        res = []
+
+        # store left side of expression in symleft:
+        res.append("%s = new %s" % (symleft, typleft))
+        res.extend(self.expression(expr.left, symleft))
+
+        # store right side of expression in symright:
+        res.append("%s = new %s" % (symright, typright))
+        res.extend(self.expression(expr.right, symright))
+
+        # store the combined value in symexpr
+        res.append("%s = new %s" % (symexpr, typexpr))
+        res.append("%s = %s %s %s" \
+                   % (symexpr, symleft, operator, symright))
+
+        # and finally put the result in our destination
+        # (imcc seems to like this as a separate step for
+        # typecasting or something...)
+        res.append("%s = %s" % (dest, symexpr))
+        return res
+    
     ##[ visitor methods ]##########################################
         
     def visitPrintnl(self, node):
@@ -153,6 +166,20 @@ class PirateVisitor:
             name = node.name
             self.append(".local string %s" % name)
             self.extend(self.expression(expr, name))
+
+    def visitWhile(self, node):
+        assert node.else_ is None, "while...else not supported"
+        self.extend(self.set_lineno(node))
+        _while = self.symbol("while")
+        _endwhile = self.symbol("endwhile")
+        self.append("%s:" % _while)
+        testvar = self.symbol("$P")
+        self.append("%s = new PerlInt" % testvar)
+        self.extend(self.expression(node.test, testvar))
+        self.append("unless %s goto %s" % (testvar, _endwhile))
+        self.visit(node.body)
+        self.append("goto %s" % _while)
+        self.append("%s:" % _endwhile)
 
 ## module interface ###############################################
 

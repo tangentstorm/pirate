@@ -81,6 +81,16 @@ class PirateTest(unittest.TestCase):
             """), dump=0)
         self.assertEquals(result, "2\n2.000000\n")
 
+    def test_while(self):
+        result = pirate.invoke(trim(
+            """
+            x = 3
+            while x:
+                print x
+                x = x - 1
+            """), dump=0)
+        self.assertEquals(result, "3\n2\n1\n")
+
             
 
 
