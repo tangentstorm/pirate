@@ -34,7 +34,7 @@ class imclist(list):
     
     def append(self, line):
         is_setline = line.startswith("setline")
-        if ':' not in line:
+        if (':' not in line) or (' ' in line):
             line = "    %-30s"  %line
             if "#" not in line:
                 if not is_setline: # work round IMCC parsing bug
@@ -187,6 +187,7 @@ class PirateVisitor(object):
             ast.UnarySub:    self.expressUnary,
             ast.UnaryAdd:    self.expressUnary,
             ast.Invert:      self.expressUnary, 
+            ast.Backquote:   self.backquote, 
             
             ast.Add: self.infixExpression,
             ast.Sub: self.infixExpression,
@@ -201,6 +202,8 @@ class PirateVisitor(object):
             ast.Bitor: self.expressBitwise,
             ast.Bitxor: self.expressBitwise,            
             ast.Bitand: self.expressBitwise,
+
+            ast.Slice: self.applySlice,
 
             # leo's patch:
             #ast.Sub: self.binaryExpression,
@@ -219,9 +222,11 @@ class PirateVisitor(object):
 
     constMap = {
         str: "PyString",
+        unicode: "PyString",
         int: "PyInt",
         float: "PyFloat",
-        complex: "Complex"
+        long: "PyLong",
+        complex: "PyComplex"
     }
 
 
@@ -229,15 +234,25 @@ class PirateVisitor(object):
         t = type(node.value)
         assert t in self.constMap, "unsupported const type:%s" % t
         r = repr(node.value)
+
+        flag = ''
+        if r.startswith("u'") or r.startswith('u"'):
+           allocate = 1
+           flag = 'u:'
+           r=r[1:]
+
         if r.startswith("'") and r.endswith("'"):
             r = r.replace('"','\\"')
             r = '"' + r[1:-1] + '"'
             r = r.replace("\\'","'")
+
         if isinstance(node.value,complex): r = '"' + r + '"'
+        if isinstance(node.value,long): r = '"' + r[:-1] + '"'
+
         if allocate>0 or (allocate==-1 and r.startswith('"')):
             dest = self.gensym()
             self.append("new %s, %s" % (dest,self.find_type(self.constMap[t])))
-            self.append("%s = %s" % (dest, r))
+            self.append("%s = %s%s" % (dest, flag, r))
             return dest
         else:
             return r
@@ -290,9 +305,6 @@ class PirateVisitor(object):
         obj = self.compileExpression(node.expr, allocate=1)
         self.append("getattribute %s, %s, '%s'" % (dest, obj, attr))
 
-        # save base object in P% for calling conventions
-        # @TODO: only do this if we're going to call the attr
-        self.append("P5 = %s" % obj)
         return dest
     
         
@@ -328,6 +340,15 @@ class PirateVisitor(object):
         ast.UnarySub: "-",
         ast.Invert:   "~",
     }
+
+    def backquote(self, node, allocate):
+        dest = self.gensym()
+        temp = self.gensym("$S")
+        value = self.compileExpression(node.expr, allocate=1)
+        self.append("get_repr %s, %s" % (temp, value))
+        self.append("new %s, %s" % (dest,self.find_type("PyString")))
+        self.append("%s = %s" % (dest, temp))
+        return dest
 
     def expressUnary(self, node, allocate):
         dest = self.gensym()
@@ -481,6 +502,47 @@ class PirateVisitor(object):
             dest = self.compileExpression(L, allocate=1)
             tmp = self.compileExpression(R, allocate=1) # until we come up with an unboxing scheme
             self.append("%s %s, %s, %s" % (operator, dest, dest, tmp))
+        return dest
+
+    def expressSlice(self, lower, upper):
+        lower = lower or ""
+        if lower:
+            lower = self.compileExpression(lower)
+            if not lower.isdigit():
+                temp = self.gensym("$I")
+                self.append("%s = %s" % (temp, lower))
+                lower = temp
+
+        upper = upper or ""
+        if upper:
+            upper = self.compileExpression(upper)
+            if not upper.isdigit():
+                temp = self.gensym("$I")
+                self.append("%s = %s" % (temp, upper))
+                upper = temp
+
+        return "%s .. %s" % (lower, upper)
+
+    def visitSlice(self, node):
+        assert node.flags == "OP_DELETE"
+        list = self.compileExpression(node.expr, allocate=-1)
+        slice = self.expressSlice(node.lower, node.upper)
+        self.append("delete %s[%s]" % (list,slice))
+
+    def applySlice(self, node, allocate):
+        assert node.flags == "OP_APPLY"
+        list = self.compileExpression(node.expr, allocate=-1)
+        slice = self.expressSlice(node.lower, node.upper)
+        dest = self.gensym()
+        self.append("%s = %s[%s]" % (dest,list,slice))
+        return dest
+
+    def assignSlice(self, node, value):
+        assert node.flags == "OP_ASSIGN"
+        list = self.compileExpression(node.expr, allocate=-1)
+        slice = self.expressSlice(node.lower, node.upper)
+        dest = self.gensym()
+        self.append("set %s[%s], %s" % (list,slice,value))
         return dest
 
     def callingExpression(self, node, allocate):
@@ -661,6 +723,7 @@ class PirateVisitor(object):
             ast.Subscript: self.assignToSubscript,
             ast.AssAttr: self.assignToProperty,
             ast.AssName: self.assignToName,
+            ast.Slice: self.assignSlice,
             }[node.__class__]
         return method(node, value)
 
@@ -814,53 +877,35 @@ class PirateVisitor(object):
         assert not isinstance(node.assign, ast.AssTuple), \
                "@TODO: for x,y not implemented yet"
         self.set_lineno(node)
-        name = self.gensym("for_%s_" % node.assign.name)
         _for = self.genlabel("for")
         _endfor = self.genlabel("endfor")
         _elsefor = self.genlabel("elsefor")
         self.loops.append((_for, _endfor))
 
-        loopidx = self.gensym("idx", 'int')
-        forlist = self.gensym("list")
-        listlen = self.gensym("iter", 'int')
+        if not node.else_: _elsefor = _endfor
 
         # first get the list
         forlist = self.compileExpression(node.list)
-
-        self.append("%s = %s" % (listlen, forlist))
-        self.append(loopidx + " = 0")
+        iter = self.gensym()
+        self.append("%s = iter %s" % (iter, forlist))
 
         # get the next item (also where "continue" jumps to)
+        item = self.gensym()
         self.label(_for)
-        self.append("if %s >= %s goto %s" % (loopidx, listlen, _elsefor))
-
-        # Okay: somewhere in our list we might call a generator.
-        # Right now generators use parrot Coroutines. Coroutines
-        # don't preserve the register stack. Without this save op,
-        # the list we're looping through tends to get replaced
-        # with the Coroutine. Other variables are probably also
-        # being screwed up, but a "saveall" here would make an
-        # infinite loop, so....
-        self.append("save " + forlist)
-        
-        value = self.gensym("forval")
-        self.append("%s = %s[%s]" % (value, forlist, loopidx))
-        self.append(self.bindLocal(node.assign.name, value))
-        self.append("%s = %s + 1" % (loopidx, loopidx))
+        self.append("unless %s goto %s" % (iter, _elsefor))
+        self.append("%s = shift %s" % (item, iter))
+        self.append(self.bindLocal(node.assign.name, item))
         
         # do the loop body
         self.visit(node.body)
-
-        # restore the list (see save note, above)
-        self.append("restore " + forlist)
 
         # loop
         self.append("goto " + _for)
 
         # else: this is where we go if the loop ends with no "break"
         self.loops.pop() # no longer part of the loop
-        self.label(_elsefor)
         if node.else_:
+            self.label(_elsefor)
             self.visit(node.else_)
             
         # end
