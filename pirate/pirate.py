@@ -1256,9 +1256,8 @@ def compile(src, name="__main__"):
                 "    push_eh __py_catch"]
         post = ["    .return ()",
                 "__py_catch:",
-                "    set S0, P5['_message']",
-                "    print S0",
-                '    print "\\n"']
+                "    print_item P5",
+                '    print_newline']
         pir.lines = pre + ["#"] + pir.lines + ["#"] + post
     code =  pir.getCode()
     return code
