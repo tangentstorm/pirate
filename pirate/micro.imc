@@ -1,0 +1,44 @@
+
+.sub __main__
+    .local Coroutine itr
+    .local object return
+    .local object counter
+    newsub itr, .Coroutine, _iterator
+ 
+    .local object zero
+    zero = new PerlInt
+    zero = 0
+
+
+    loop:
+        savetop
+        newsub return, .Continuation, return_here
+        .pcc_begin non_prototyped
+            .pcc_call itr, return
+             return_here:
+            .result counter
+        .pcc_end
+
+        print counter
+        print " "
+      
+        ### zero = 0
+        print zero
+        print "\n"
+
+    goto loop
+    end
+.end
+
+
+.pcc_sub _iterator non_prototyped
+    .local object x
+    x = new PerlInt
+    x = 0
+    loop:
+        .pcc_begin_yield
+        .return x
+        .pcc_end_yield
+        x = x + 1
+    goto loop
+.end
