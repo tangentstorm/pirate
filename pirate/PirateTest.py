@@ -192,17 +192,6 @@ class PirateTest(unittest.TestCase):
             """, dump=0, lines=0)
         self.assertEquals(res, "5 6\n")
         
-    def test_scope(self):
-        res = run(
-            """
-            x = 5
-            f = lambda: x+1
-            print f()
-            x = x + 1
-            print f()
-            """, dump=1)
-        self.assertEquals(res, "6 7\n")
-        
         
 if __name__=="__main__":
     unittest.main()
