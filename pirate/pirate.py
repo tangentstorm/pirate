@@ -386,6 +386,42 @@ class PirateVisitor(object):
         #self.append("%s = %s" % (dest, result))
         return dest
 
+    compOps = {
+        "!=": "isne",
+        "<":  "islt",
+        "<=": "isle",
+        "<>": "isne",
+        "==": "iseq",
+        ">":  "isgt",
+        ">=": "isge",
+    }
+
+    def unlessExpression(self, test, label):
+        "optimize simple if statements"
+
+        if isinstance(test, ast.Compare):
+
+            op, code = test.ops[0]
+            if op=="is": op="=="
+            if op=="<>": op="!="
+        
+            if op<>"in":
+                symL = self.compileExpression(test.expr, allocate=1)
+                symR = self.compileExpression(code)
+                self.append("unless %s %s %s goto %s" % (symL, op, symR, label))
+            else:
+                testvar = self.compileExpression(test)
+                self.append("unless %s goto %s" % (testvar, label))
+
+        elif isinstance(test, ast.Const):
+            if not test.value: 
+                self.append("goto %s" % label)
+                self.reachable=False
+
+        else:
+            testvar = self.compileExpression(test)
+            self.append("unless %s goto %s" % (testvar, label))
+        
     def compareExpression(self, expr, allocate):
         assert len(expr.ops) == 1, "@TODO: multi-compare not working yet"
         dest = self.gensym()
@@ -394,7 +430,6 @@ class PirateVisitor(object):
 
         # get the op:
         op, code = expr.ops[0]
-        if op=="<>": op="!="
         if op=="is": op="=="
         
         # get right side:
@@ -402,7 +437,11 @@ class PirateVisitor(object):
 
         self.append("new %s, %s" % (dest,self.find_type("PyBoolean")))
 
-        if op=="in":
+        if op in self.compOps:
+            temp = self.gensym("$I")
+            self.append("%s %s, %s, %s" % (self.compOps[op], temp, symL, symR))
+            self.append("%s = %s" % (dest, temp))
+        elif op=="in":
             temp = self.gensym("$I")
             self.append("exists %s, %s[%s]" % (temp, symR, symL))
             self.append("%s = %s" % (dest, temp))
@@ -592,8 +631,7 @@ class PirateVisitor(object):
             self.set_lineno(test)
             _elif = labels.pop()
 
-            testvar = self.compileExpression(test)
-            self.append("unless %s goto %s" % (testvar, _elif))
+            self.unlessExpression(test, _elif)
             
             # do it and goto _endif
             self.visit(body)
@@ -754,12 +792,17 @@ class PirateVisitor(object):
         
         self.label(_while)
         testvar = self.compileExpression(node.test)
-        self.append("unless %s goto %s" % (testvar, _elsewhile))
-        self.visit(node.body)
-        self.append("goto " + _while)
-        self.label(_elsewhile)
         if node.else_:
+            self.unlessExpression(node.test, _elsewhile)
+            self.visit(node.body)
+            self.append("goto " + _while)
+            self.label(_elsewhile)
             self.visit(node.else_)
+        else:
+            self.unlessExpression(node.test, _endwhile)
+            self.visit(node.body)
+            self.append("goto " + _while)
+
         self.label(_endwhile)
         self.loops.pop()
 
