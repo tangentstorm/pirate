@@ -38,6 +38,7 @@ y visitAssert:
 y visitTryExcept:  # single handler, no storing the object, no else
 y visitTryFinally: # also, exception handlers persist (clear_eh op dumps core)
 y visitYield:      # but no iterators: g.next() works, for y in g() doesn't
+y del ( OP_DELETE in assign )
 
 
 # e just means it was done in the expression() method
@@ -78,8 +79,6 @@ n visitKeyword: keyword arguments (on calling side)
 
 
 ## assignments ###########
-n del ( OP_DELETE in assign ) (not possible yet in parrot)
-
 n visitAugAssign:
 n visitAugName(self, node, mode):
 n visitAugSubscript(self, node, mode):

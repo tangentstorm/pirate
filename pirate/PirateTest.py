@@ -140,16 +140,38 @@ class PirateTest(unittest.TestCase):
             """, dump=0, lines=1)
         self.assertEquals(res, "-1 1 -2 0 ")
 
-## @TODO: no support for del_lex in parrot yet
-##
-##     def test_del(self):
-##         res = self.run(
-##             """
-##             x = 1
-##             del x
-##             print x
-##             """)
-##         self.assertEquals(res, "Lexical 'x' not found\n")
+
+    ## del #######################################
+
+    def test_del_name(self):
+        res = self.run(
+            """
+            x = 1
+            del x
+            print x
+            """)
+        self.assertEquals(res, "Lexical 'x' not found\n")
+
+    def test_del_attr(self):
+        res = self.run(
+            """
+            class C: pass
+            C.x = 1
+            print C.x,
+            del C.x
+            print C.x
+            """, dump=0)
+        self.assertEquals(res, "1 AttributeError: x\n")
+
+    def test_del_key(self):
+        res = self.run(
+            """
+            d = {'a':'b'}
+            print d['a'],
+            del d['a']
+            print d['a']
+            """, dump=0)
+        self.assertEquals(res, "b KeyError: a\n")
 
 
     ## pass ######################################

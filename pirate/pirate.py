@@ -200,6 +200,19 @@ class PirateVisitor(object):
         return dest
 
 
+
+    def assertNotUndefined(self, what, error):
+        # @TODO: remove thess runtime checks once Pyobjects work
+        # parrotclass.getprop returns PerlUndef if not present so:
+        endCheck = self.symbol("endCheck")
+        self.append("typeof $S0, %(what)s" % locals())
+        #self.append("print $S0")
+        self.append("unless $S0 == 'PerlUndef' goto %(endCheck)s" % locals())
+        ex = ast.Raise(ast.Const(error), None, None)
+        self.visit(ex)
+        self.append("%(endCheck)s:" % locals())
+
+
     def expressSubscript(self, node, dest, allocate):
         assert len(node.subs) == 1, "huh? multiple subscripts?" # huh?
         
@@ -214,8 +227,16 @@ class PirateVisitor(object):
         self.compileExpression(node.subs[0], subs, allocate=0)
 
         slot = "%(dict)s[%(subs)s]" % locals()
-        
-        if dest:
+
+        if node.flags != "OP_ASSIGN":
+            check = self.symbol("$P")
+            self.append("%(check)s = %(slot)s" % locals())
+            key = getattr(node.subs[0], "value", node.subs[0])
+            self.assertNotUndefined(check, "KeyError: %(key)s" % locals())
+
+        if node.flags == "OP_DELETE":
+            self.append("delete %(slot)s" % locals())
+        elif dest:
             self.append("%(dest)s = %(slot)s" % locals())
             return dest
         else:
@@ -228,6 +249,7 @@ class PirateVisitor(object):
         obj = self.imcObject("obj")
         self.compileExpression(node.expr, obj, allocate=1)
         self.append("getprop %(dest)s, '%(attr)s', %(obj)s" % locals())
+        self.assertNotUndefined(dest, 'AttributeError: %(attr)s' % locals())
         return dest
     
         
@@ -638,13 +660,6 @@ class PirateVisitor(object):
         self.compileExpression(expr, value)
         return value
 
-    def visitAssName(self, node):
-        """
-        As far as I can tell, this node is only used for 'del name'
-        """
-        assert node.flags == "OP_DELETE", "expected AssName to be a del!"
-        raise NotImplementedError("@TODO: waiting on parrot to get del_lex")
-
 
     def visitAssign(self, node):
 
@@ -679,6 +694,39 @@ class PirateVisitor(object):
             ## @TODO: unpack wrong size check should also be at runtime
             raise ValueError("unpack sequence of wrong size")
 
+    ##[ del ]######################################################
+
+    def visitAssName(self, node):
+        """
+        As far as I can tell, this node is only used for 'del name'
+        """
+        assert node.flags == "OP_DELETE", "expected AssName to be a del!"
+        pad = self.symbol("pad")
+        name = node.name
+        self.append(".local object %(pad)s" % locals())
+        self.append("peek_pad %(pad)s" % locals())
+        self.append("delete %(pad)s['%(name)s']" % locals())
+
+    def visitAssAttr(self, node):
+        assert node.flags == "OP_DELETE", "expected AssGetattr to be a del!"
+        assert isinstance(node.expr, ast.Name), "only del name.attr allowed"
+        # @TODO: allow del (expression).name
+        # can't do this yet because of store_lex
+        var = node.expr.name
+        atr = node.attrname
+        obj = self.imcObject("obj")
+        self.compileExpression(node.expr, obj)
+        self.append("delprop %(obj)s, '%(atr)s'" % locals())
+        
+        # this next line is really really wrong:
+        #  - it really should be modifying the actual object, not a copy.
+        #  - multiple find_lex and store_lex should be optimized out anyway.
+        self.append("store_lex '%(var)s', %(obj)s" % locals())
+
+
+    def visitSubscript(self, node):
+        assert node.flags == "OP_DELETE"
+        self.expressSubscript(node, dest=None, allocate=0)
 
 
     ##[ control stuctures ]#########################################
