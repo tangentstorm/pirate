@@ -1,0 +1,22 @@
+# py...rrot 
+
+Pirate is Michal's attempt at a python
+compiler for parrot.
+
+It's loosely based on amk's parrot-gen.py:
+
+   http://www.amk.ca/conceit/parrot.html
+
+The main differences so far:
+
+   - pirate uses imcc instead of assemble.pl
+   - pirate is backed by unit tests
+
+   - but parrot-gen implements lot more.
+
+I'm actually stealing code bit by bit from
+parrot-gen.py and incorporating it into 
+pirate. This is my first compiler and my
+first attempt at using python parse trees,
+so I figured I'd go slow and test first. :)
+
