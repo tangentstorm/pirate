@@ -24,6 +24,7 @@ to work with the new intermediate code compiler
     - math operations (+, -, *, /, %)
     - boolean logic (and, or, not)
     - comparison operators
+    - function calls
     - lambda
 
 
