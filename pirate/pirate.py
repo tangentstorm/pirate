@@ -893,12 +893,13 @@ class PirateSubVisitor(PirateVisitor):
         return "\n".join(res)
 
     def getCodeForGenerator(self):
+        
         stop = ast.Raise(ast.Const("StopIteration"), None, None)
         self.visit(stop)
 
         name = self.name
         res = []
-        res.append(".pcc_sub %(name)s" % locals())
+        res.append(".pcc_sub %(name)s non_prototyped" % locals())
         res.append("   .local object gen_fun")
         res.append("   .local object gen_obj")
         res.append("   newsub gen_fun, .Coroutine, %(name)s_g" % locals())
@@ -908,7 +909,7 @@ class PirateSubVisitor(PirateVisitor):
         res.append("   .return gen_obj")
         res.append("   .pcc_end_return")
         res.append(".end")
-        res.append(".pcc_sub %(name)s_g" % locals())
+        res.append(".pcc_sub %(name)s_g non_prototyped" % locals())
         res.append("   new_pad -1")
         res.extend(self.lines)
         res.append(".end")
