@@ -138,9 +138,10 @@ class PirateTest(unittest.TestCase):
     def test_break(self):
         res = run(
             """
-            for num in [1, 2, 3, 4, 5]:
-                print num, 
-                if num == 2: break
+            for x in [1, 2]:
+                for y in [1,2,3,4,5]:
+                    if y >1: break
+                    print [x,y],
             
             num = 0
             while 1:
@@ -148,7 +149,7 @@ class PirateTest(unittest.TestCase):
                 print num,
                 if num == 2: break
             """)
-        self.assertEquals(res, "1 2 1 2 ")
+        self.assertEquals(res, "[1, 1] [2, 1] 1 2 ")
 
     def test_continue(self):
         res = run(
