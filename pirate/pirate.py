@@ -53,15 +53,25 @@ class PirateVisitor:
         compiler.ast.And: '&&',
         compiler.ast.Or: '||',
     }
+    
+    typeMap = {
+        str: "PerlString",
+        int: "PerlNum",
+    }
 
     def expression(self, expr, dest):
         """
         create code to eval expression Node 'expr' and put it in 'dest'
         """
         if isinstance(expr, compiler.ast.Name):
-            return ["%s = %s" % (dest, expr.name)]
+            return ["%s = new PerlString" % (dest),
+                    "%s = %s #XX" % (dest, expr.name)]
         elif isinstance(expr, compiler.ast.Const):
-            return ["%s = %s" % (dest, repr(expr.value))]
+            t = type(expr.value)
+            assert t in self.typeMap, "unsupported const type:%s" % t
+            return [("%s = new %s" % (dest, self.typeMap[t])),
+                    ("%s = %s" % (dest, repr(expr.value)))]
+        
         elif isinstance(expr, tuple(self.infixOps.keys())):
             return self.infixExpression(expr, dest)
         elif isinstance(expr, compiler.ast.Compare):
@@ -89,9 +99,9 @@ class PirateVisitor:
         
     def infixExpression(self, expr, dest):
         operator = self.infixOps[expr.__class__]
-        symleft,  typleft  = self.symbol("$P"), "PerlInt"
-        symright, typright = self.symbol("$P"), "PerlInt"
-        symexpr,  typexpr  = self.symbol("$P"), "PerlInt"
+        symleft,  typleft  = self.symbol("$P"), "PerlNum"
+        symright, typright = self.symbol("$P"), "PerlNum"
+        symexpr,  typexpr  = self.symbol("$P"), "PerlNum"
         res = []
 
         # store left side of expression in symleft:
@@ -112,13 +122,13 @@ class PirateVisitor:
         # typecasting or something...)
         res.append("%s = %s" % (dest, symexpr))
         return res
+    
 
     def compareExpression(self, expr, dest):
         assert len(expr.ops) == 1, "multi-compare not working yet"
         res = []       
         # get left side:
         symL = self.symbol("$P")
-        res.append("%s = new PerlInt" % symL)
         res.extend(self.expression(expr.expr, symL))
 
         # get the op:
@@ -127,11 +137,11 @@ class PirateVisitor:
         
         # get right side:
         symR = self.symbol("$P")
-        res.append("%s = new PerlInt" % symR)
         res.extend(self.expression(code, symR))
 
         _cmp = self.symbol("_cmp")
         _end = self.symbol("_end")
+        res.append("%s = new PerlNum" % dest)
         res.append("if %s %s %s goto %s" % (symL, op, symR, _cmp))
         res.append("%s = 0" % dest)
         res.append("goto %s" % _end)
@@ -140,6 +150,7 @@ class PirateVisitor:
         res.append("%s:" % _end)
         return res
 
+
     ##[ visitor methods ]##########################################
         
     def visitPrint(self, node):
@@ -147,10 +158,10 @@ class PirateVisitor:
         for n in node.nodes:
             self.extend(self.set_lineno(n))
             dest = self.symbol("$P")
-            self.append("%s = new PerlString" % dest) 
             self.extend(self.expression(n, dest))
             self.append('print %s' % dest) # % repr(n.value))
             self.append('print " "')
+
 
     def visitPrintnl(self, node):
         self.visitPrint(node)
@@ -198,6 +209,7 @@ class PirateVisitor:
             name = node.name
             self.append(".local string %s" % name)
             self.extend(self.expression(expr, name))
+
 
     def visitWhile(self, node):
         assert node.else_ is None, "while...else not supported"
