@@ -643,7 +643,7 @@ class PirateVisitor(object):
             vis.preorder(ast.Return(node.code), pir)
         else:
             vis.preorder(node.code, pir)
-            if pir.isGenerator and pir.method:
+            if pir.isGenerator:
                 # Python generators return, so parameters aren't local
                 pir = PirateSubVisitor(sub,
                                depth = self.depth+1,
