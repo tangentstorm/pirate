@@ -21,7 +21,10 @@ from compiler import ast
 
 class imclist(list):
     """
-    a list containing one imc instruction per line
+    a list containing one imc instruction per line.
+    it automagically figures out which line in pirate.py
+    generated the code and appends that information 
+    as a comment.
     """
     def append(self, line):
         if ':' not in line:
@@ -44,12 +47,12 @@ class PirateVisitor(object):
 
     ##[ management stuff ]##########################################
     
-    def __init__(self, name):
+    def __init__(self, name, counter=None):
         self.name = name
         self._last_lineno = None
         self.lines = imclist()
         self.loops = []
-        self.counter = {}
+        self.counter = counter or {}
         self.subs = []
         self.vars = {}
 
@@ -57,16 +60,17 @@ class PirateVisitor(object):
         """
         Return a unique symbol for label names in generated code
         """
-        self.counter.setdefault(prefix,0)
+        self.counter.setdefault(prefix,-1)
         self.counter[prefix] += 1
-        return "%s%05i" % (prefix, self.counter[prefix])
+        return "%s%i" % (prefix, self.counter[prefix])
 
     def getCode(self):
         res  = ".sub %s\n" % self.name
+        res += "    new_pad 0\n"
         res += "\n".join(self.lines) + "\n"
         res += ".end\n"
-        res += ".include 'pirate.imc'"
-        res += "\n".join([s.getCode() for s in self.subs]) + "\n"
+        res += ".include 'pirate.imc'\n\n"
+        res += "\n\n".join([s.getCode() for s in self.subs]) + "\n"
         return res
     
 
@@ -103,8 +107,11 @@ class PirateVisitor(object):
             return 
         
         handler = {
+            # new stye: return their own dest
+            ast.Const:    self.expressConstant,
+            
+            # old style (return nothing)
             ast.Name:     self.nameExpression,
-            ast.Const:    self.constantExpression,
             ast.List:     self.listExpression,
             ast.Lambda:   self.lambdaExpression,
             ast.CallFunc: self.callingExpression,
@@ -139,11 +146,15 @@ class PirateVisitor(object):
     }
 
 
-    def constantExpression(self, expr, dest):
+    def expressConstant(self, expr, dest):
         t = type(expr.value)
         assert t in self.constMap, "unsupported const type:%s" % t
-        self.append("%s = new %s" % (dest, self.constMap[t]))
-        self.append("%s = %s" % (dest, repr(expr.value)))
+        if dest:
+            self.append("%s = new %s" % (dest, self.constMap[t]))
+            self.append("%s = %s" % (dest, repr(expr.value)))
+            return dest
+        else:
+            return expr.value
 
 
     def nameExpression(self, expr, dest):
@@ -163,6 +174,11 @@ class PirateVisitor(object):
 	float: "N"
     }
     def binaryExpression(self, node, dest):
+        #@TODO: this isn't used yet (because it doesn't work
+        # for all nodes and requires some refactoring) It's
+        # leo's code for type inference... Probably ought
+        # to go into the generic code generator. 
+        
         op = self.infixOps[node.__class__]
         
         # special case for constants
@@ -182,7 +198,7 @@ class PirateVisitor(object):
 
         # at least one non-constant
 	else:
-	    lexpr = self.compileExpression(node.left, dest)            
+	    lexpr = self.compileExpression(node.left, dest)
 	    if isinstance(node.left, ast.Const) or not lexpr.find("$P") == 0:
 		lsym = self.symbol("$P")
 		self.append("%s = new PerlUndef" % lsym)
@@ -199,7 +215,7 @@ class PirateVisitor(object):
 	    sym = self.symbol("$P")
 	    self.append("%s = new PerlUndef" % sym)
 	self.append("%s = %s %s %s" % (sym, lsym, op, rsym))
-	return ["%s = %s" % (dest, sym)]
+	return dest
 
 
 
@@ -216,22 +232,20 @@ class PirateVisitor(object):
     }
 
         
-    def infixExpression(self, expr, dest):
-        operator = self.infixOps[expr.__class__]
-        symleft,  typleft  = self.symbol("$P"), "PerlInt"
-        symright, typright = self.symbol("$P"), "PerlInt"
-        symexpr,  typexpr  = self.symbol("$P"), "PerlInt"
+    def infixExpression(self, node, dest):
+        operator = self.infixOps[node.__class__]
+        symleft  = self.symbol("$P")
+        symright = self.symbol("$P")
+        symexpr  = self.symbol("$P")
 
         # store left side of expression in symleft:
-        self.append("%s = new %s" % (symleft, typleft))
-        self.compileExpression(expr.left, symleft)
+        self.compileExpression(node.left, symleft)
 
         # store right side of expression in symright:
-        self.append("%s = new %s" % (symright, typright))
-        self.compileExpression(expr.right, symright)
+        self.compileExpression(node.right, symright)
 
         # store the combined value in symexpr
-        self.append("%s = new %s" % (symexpr, typexpr))
+        self.append("%s = new PerlUndef" % symexpr) #, typexpr))
         self.append("%s = %s %s %s" \
                     % (symexpr, symleft, operator, symright))
 
@@ -302,28 +316,19 @@ class PirateVisitor(object):
             args.append(".arg %s" % var)
 
         # figure out what we're calling
-        adr = self.symbol("$I")        
+        sub_pmc = self.symbol("$P")
         if isinstance(node.node, ast.Lambda):
             # lambdas don't have names!
-            self.lambdaExpression(node.node, adr, allocate=0)
+            self.lambdaExpression(node.node, sub_pmc, allocate=0)
         else:
             sub = node.node.name
-            self.append("%s = %s" % (adr, sub))
+            self.append("find_lex %s, '%s'" % (sub_pmc, sub)) 
 
-        sub_pmc = self.symbol("$P")
-        ret = self.symbol("returnaddr")
+        ret = self.symbol("ret")
         ret_pmc = self.symbol("$P")
 
         ## now call it:
-
-        # @TODO: newsub op not working for me yet
-        self.append("%s = new Sub" % sub_pmc)
-        self.append("%s = %s" % (sub_pmc, adr))
-        self.append("%s = new Continuation" % ret_pmc)
-        cadr = self.symbol("$I")
-        self.append("%s = addr %s" % (cadr, ret))
-        self.append("%s = %s" % (ret_pmc, cadr))
-                
+        self.append("newsub %s, .Continuation, %s" % (ret_pmc, ret))
         self.append(".pcc_begin non_prototyped")
         for r in args:
             self.append(r)
@@ -342,23 +347,39 @@ class PirateVisitor(object):
         assert not node.kwargs or node.varargs, "only simple args for now"
         self.set_lineno(node)
 
-        # anonymous function, so no name
+        # functions are always anonymous, so make fake names
         sub = self.symbol("_sub")
-        adr = self.symbol("$I")
+        ref = self.symbol("$P")
 
+        # but sometimes they have a name bound to them (def vs lambda):
+        isLambda = not hasattr(node, "name")
+        
+        if isLambda:
+            comment = "lambda from line %s" % (node.lineno)
+        else:
+            comment = "%s from line %s" % (node.name, node.lineno)
+            
         # fork a new code generator to walk the function's tree:
         vis = compiler.visitor.ASTVisitor()
         pir = PirateSubVisitor(sub,
-                               doc="lambda from line %s" % node.lineno,
+                               doc=comment,
+                               counter = self.counter,
                                args=node.argnames)
-        vis.preorder(ast.Return(node.code), pir)
+
+        # lambda is really just a single return function:
+        if isLambda:            
+            vis.preorder(ast.Return(node.code), pir)
+        else:
+            vis.preorder(node.code, pir)
+            
         self.subs.append(pir)
 
         # store the address in dest
-        self.append("%s = addr %s" % (adr, sub))
+        self.append("newsub %s, .Sub, %s" % (ref, sub))
         if allocate:
-            self.append("%s = new PerlInt" % dest)
-        self.append("%s = %s" % (dest, adr))
+            self.append("store_lex -1, '%s', %s" % (dest, ref))
+        else:
+            self.append("%s = %s" % (dest, ref))
 
 
 
@@ -514,7 +535,7 @@ class PirateVisitor(object):
         self.append("noop")
 
     def visitFunction(self, node):  # visitDef
-        self.append(".local object %s" % node.name) #@TODO: use set_lex
+        #self.append(".local object %s" % node.name) #@TODO: use set_lex
         self.genFunction(node, node.name, allocate=1)
 
 
@@ -527,10 +548,11 @@ class PirateSubVisitor(PirateVisitor):
     work on subroutines instead of whole
     programs.
     """
-    def __init__(self, name, doc, args=[]):
-        super(PirateSubVisitor, self).__init__(name)
+    def __init__(self, name, doc, counter, args=[]):
+        super(PirateSubVisitor, self).__init__(name, counter=counter)
         self.doc = doc
         self.args = args
+        self.counter = counter
     def getCode(self):
         res = ""
         if self.doc:

@@ -68,6 +68,13 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "1 2 3\n")
 
 
+    def test_simplemath(self):
+        res = self.run(
+            """
+            print 1+2+3
+            """, dump=0)
+        self.assertEquals(res, "6\n")
+
     def test_math(self):
         res = self.run(
             """
@@ -172,6 +179,25 @@ class PirateTest(unittest.TestCase):
 ##         self.assertEquals(res, "function call!")
 
         
+    def test_pass(self):
+        res = self.run(
+            """
+            pass
+            """, dump=0, lines=0)
+        self.assertEquals(res, "")
+
+
+    ## function-related stuff ##############################
+
+    def test_minimal_function(self):
+        res = self.run(
+            """
+            def f(): return 1
+            print f()
+            """, dump=0, lines=1)
+        self.assertEquals(res, "1\n")
+            
+
     def test_lambda(self):
         res = self.run(
             """
@@ -179,6 +205,7 @@ class PirateTest(unittest.TestCase):
             print f(4), f(5)
             """, dump=0, lines=1)
         self.assertEquals(res, "5 6\n")
+
         
     def test_lambda_anonymous(self):
         res = self.run(
@@ -186,14 +213,6 @@ class PirateTest(unittest.TestCase):
             print (lambda x: x*x)(5)
             """, dump=0, lines=0)
         self.assertEquals(res, "25\n")
-
-
-    def test_pass(self):
-        res = self.run(
-            """
-            pass
-            """, dump=0, lines=0)
-        self.assertEquals(res, "")
 
 
     def test_def(self):
@@ -205,19 +224,44 @@ class PirateTest(unittest.TestCase):
             """, dump=0, lines=1)
         self.assertEquals(res, "1\n")
 
-## recursion doesn't work yet.
-##     def test_recursion(self):
-##         res = self.run(
-##             """
-##             def f(x):
-##                 if x > 0:
-##                     print x
-##                     return f(x-1)
-##                 else:
-##                     return 0
-##             f(5)
-##             """, dump=1, lines=1)
-##         self.assertEquals(res, "1\n")
+
+    def test_multi_return(self):
+        res = self.run(
+            """
+            def f(x):
+                if x:
+                    return 1
+                else:
+                    return 0
+            print f(1), f(0)
+            """, dump=0, lines=0)
+        self.assertEquals(res, "1 0\n")
+
+
+    def test_nested_call(self):
+        res = self.run(
+            """
+            def g():
+                return 0
+            def f():
+                return g()
+            print f()
+            """, dump=0, lines=0)
+        self.assertEquals(res, "0\n")
+
+
+    def test_recursion(self):
+        res = self.run(
+            """
+            def f(x):
+                print x,
+                if x==0:
+                    return 0
+                else:
+                    return f(x-1)
+            f(1)
+            """, dump=0, lines=0)
+        self.assertEquals(res, "1 0 ")
 
 
         
