@@ -1107,18 +1107,17 @@ class PirateVisitor(object):
 
     def visitClass(self, node):
         name = node.name
-        super = self.gensym()
         klass = self.gensym()
         genname = self.genlabel("_" + str(name))
         
-        self.append("getclass %s, 'PyClass'" % super)
-        self.append("subclass %s, %s, '%s'" % (klass, super, genname))
+        if len(node.bases):
+            assert len(node.bases) == 1, "Multiple bases not supported yet"
+            super = self.compileExpression(node.bases[0])
+        else:
+            super = self.gensym()
+            self.append("getclass %s, 'PyType'" % super)
 
-        # now set the name attribute
-        namesym = self.gensym()
-        self.append("new %s, %s" % (namesym,self.find_type("PyString")))
-        self.append("%s = '%s'" % (namesym, name))
-        self.append("setprop %s, '__name__', %s" % (klass, namesym))
+        self.append("subclass %s, %s, '%s'" % (klass, super, name))
         self.append(self.bindLocal(name, klass))
 
         self.classStack.append(klass)
@@ -1207,6 +1206,14 @@ class PirateSubVisitor(PirateVisitor):
         self.append(".sub \"%s\" @ANON" % name, indent=False)
         label = self.genlabel("gen")
 
+        if self.method and self.args:
+            self.append(self.bindLocal(self.args[0], "P2"))
+            for (i,arg) in enumerate(self.args[1:]):
+                self.append(self.bindLocal(arg, "P%d" % (i+5)))
+        else:
+            for (i,arg) in enumerate(self.args):
+                self.append(self.bindLocal(arg, "P%d" % (i+5)))
+
         self.append("newsub %s, .Coroutine, %s" % (gen,label))
         self.append("new %s, %s" % (result,self.find_type("PyGen")))
         self.append("setref %s, %s" % (result,gen))
@@ -1214,6 +1221,15 @@ class PirateSubVisitor(PirateVisitor):
         self.append(".return (%s)" % result)
         self.label(label)
         self.append("new_pad -1")
+
+        if self.method and self.args:
+            self.append("find_lex P2, '%s'" % self.args[0])
+            for (i,arg) in enumerate(self.args[1:]):
+                self.append("find_lex P%d, '%s'" % (i+5, arg))
+        else:
+            for (i,arg) in enumerate(self.args):
+                self.append("find_lex P%d, '%s'" % (i+5, arg))
+
         self.lines.extend(code)
 
         if self.emptyReturn:
