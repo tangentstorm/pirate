@@ -65,8 +65,8 @@ class PirateVisitor(object):
         self.loops = []
         self.counter = counter or {}
         self.subs = []
-        self.vars = {}
         self.depth = depth or 0 # lexical scope depth
+        self.klass = 0
         self.globals = {}
         self.classStack = [] # the class we're looking at right now
         self.reachable = True
@@ -571,7 +571,7 @@ class PirateVisitor(object):
         if isinstance(node.node, ast.Lambda):
             sub = self.lambdaExpression(node.node, allocate=0)
         elif isinstance(node.node, ast.Getattr):
-            obj = self.compileExpression(node.node.expr)
+            obj = self.compileExpression(node.node.expr, allocate=1)
             sub = "%s.%s" % (obj,node.node.attrname)
         else:
             sub = self.compileExpression(node.node, allocate=1)
@@ -618,10 +618,10 @@ class PirateVisitor(object):
 
 
     def lambdaExpression(self, node, allocate=0):
-        return self.genFunction(node, None, allocate=0)
+        return self.genFunction(node, None, method=False, allocate=0)
 
 
-    def genFunction(self, node,  name, allocate=1):
+    def genFunction(self, node,  name, method=False, allocate=1):
         self.set_lineno(node)
 
         # functions are always anonymous, so make fake names
@@ -642,7 +642,7 @@ class PirateVisitor(object):
                                depth = self.depth+1,
                                doc=comment,
                                counter = None, # self.counter,
-                               vars = self.vars,
+                               method = method,
                                args=node.argnames)
 
         # lambda is really just a single return function:
@@ -673,7 +673,6 @@ class PirateVisitor(object):
 
         if allocate>0:
             self.append(self.bindLocal(node.name, ref))
-            self.vars[ref] = ref
         return ref
 
     ##[ list comprehensions ]#######################################
@@ -1022,10 +1021,12 @@ class PirateVisitor(object):
         self.append("noop")
 
     def visitFunction(self, node):  # visitDef
-        fun = self.genFunction(node, node.name, allocate=1)
         if self.classStack:
+            fun = self.genFunction(node, node.name, method=True, allocate=1)
             klass = self.classStack[-1]
             self.append("setprop %s, '%s', %s" % (klass, node.name, fun))
+        else:
+            fun = self.genFunction(node, node.name, method=False, allocate=1)
             
 
     def visitReturn(self, node):
@@ -1131,13 +1132,18 @@ class PirateSubVisitor(PirateVisitor):
     work on subroutines instead of whole
     programs.
     """
-    def __init__(self, name, depth, doc, counter, vars, args=[]):
+    def __init__(self, name, depth, doc, counter, method, args=[]):
         super(PirateSubVisitor, self).__init__(name, counter=counter)
         self.doc = doc
         self.args = args
-        # self.locals = vars
-        for (i,arg) in enumerate(self.args):
-            self.locals[arg] = "P%d" % (i+5)
+        self.method = method
+        if self.method and self.args:
+            self.locals[self.args[0]] = "P2"
+            for (i,arg) in enumerate(self.args[1:]):
+                self.locals[arg] = "P%d" % (i+5)
+        else:
+            for (i,arg) in enumerate(self.args):
+                self.locals[arg] = "P%d" % (i+5)
         self.counter = counter or {}
         self.depth = depth
         self.globals = []
@@ -1163,8 +1169,13 @@ class PirateSubVisitor(PirateVisitor):
         self.append(".sub %s @ANON" % self.name, indent=False)
         self.append("new_pad %s" % self.depth) #@TODO: use -1 here??
         
-        for (i,arg) in enumerate(self.args):
-            self.append(self.bindLocal(arg, "P%d" % (i+5)))
+        if self.method and self.args:
+            self.append(self.bindLocal(self.args[0], "P2"))
+            for (i,arg) in enumerate(self.args[1:]):
+                self.append(self.bindLocal(arg, "P%d" % (i+5)))
+        else:
+            for (i,arg) in enumerate(self.args):
+                self.append(self.bindLocal(arg, "P%d" % (i+5)))
         self.lines.extend(code)
 
         if self.emptyReturn:
