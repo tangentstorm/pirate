@@ -192,8 +192,8 @@ class PirateVisitor:
         symR = self.symbol("$P")
         res.extend(self.expression(code, symR))
 
-        _cmp = self.symbol("_cmp")
-        _end = self.symbol("_end")
+        _cmp = self.symbol("cmp")
+        _end = self.symbol("endcmp")
         res.append("%s = new PerlInt" % dest)
         res.append("if %s %s %s goto %s" % (symL, op, symR, _cmp))
         res.append("%s = 0" % dest)
@@ -473,8 +473,8 @@ if __name__=="__main__":
         if "-d" in sys.argv:
             print compile(src)
         else:
-            print invoke(src)
+            sys.stdout.write(invoke(src))
     else:
         print __doc__
         sys.exit()
-
+        
