@@ -42,6 +42,27 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "1 2 3 f g\n")
 
 
+    def test_augmented_assignment(self):
+        res = self.run(
+            """
+            x = 2; x -= 1; print x,
+            y = [[2, 3, 34]]; y[0][2] %= 30; print y[0],
+            class a: pass
+            a.x = 2; a.x += 3; print a.x
+            """, dump=0)
+        self.assertEquals(res, "1 [2, 3, 4] 5\n")
+
+
+    def test_nested_subscripts(self):
+        res = self.run(
+            """
+            x = [[0]]
+            x[0][0] = 1
+            print x[0][0]
+            """)
+        self.assertEquals(res, "1\n")
+
+        
     def test_unpack_wrong_size(self):
         try:
             res = self.run(
@@ -209,6 +230,20 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "3 2 1 ")
 
 
+    def test_while_else(self):
+        res = self.run(
+            """
+            a = 0
+            while a == 0: a = 5
+            else: print "OK",
+            while a != 0: break
+            else: print "FAILED"
+            while a != 0: a -= 1; print a,; continue
+            else: print "OK"
+            """)
+        self.assertEquals(res, "OK 4 3 2 1 0 OK\n")
+
+
     def test_if(self):
         res = self.run(
             """
@@ -243,9 +278,31 @@ class PirateTest(unittest.TestCase):
             for num in [1, 2, 3, 4, 5]:
                 print num * num,
             print
+            for x in []: print "FAILED"
+            a = 0
+            for x in 1,2,3:
+                a += 1
+                if a > 3: print "FAILED"; break
+                continue # loop should iterate after each continue
             """, dump=0)
         self.assertEquals(res, "1 4 9 16 25 \n")
 
+
+    def test_for_else(self):
+        res = self.run(
+            """
+            for a in [0,1,2,3,4]:
+                if a % 2: continue
+                print a,
+            else: print "OK"
+            for a in [1]: break
+            else: print "FAILED"
+            #@TODO: Would be nice to check break-from-else too, like this:
+            #for a in [1]: pass
+            #else: break # should be a SyntaxError
+            """, dump=0)
+        self.assertEquals(res, "0 2 4 OK\n")
+            
 
     def test_break(self):
         res = self.run(
