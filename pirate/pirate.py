@@ -231,7 +231,7 @@ class PirateVisitor(object):
         int: "PyInt",
         float: "PyFloat",
         long: "PyLong",
-        complex: "PyComplex"
+        complex: "PyComplex",
     }
 
 
@@ -498,12 +498,10 @@ class PirateVisitor(object):
             self.append("new %s, %s" % (dest, self.find_type("PyBoolean")))
             self.append("not %s, %s" % (dest,tmp))
         else:
-            L,R = expr.nodes
-            tmp = self.gensym()
-            self.append("new %s, %s" % (tmp, self.find_type("PyBoolean")))
-            dest = self.compileExpression(L, allocate=1)
-            tmp = self.compileExpression(R, allocate=1) # until we come up with an unboxing scheme
-            self.append("%s %s, %s, %s" % (operator, dest, dest, tmp))
+            dest = self.compileExpression(expr.nodes[0], allocate=1)
+            for right in expr.nodes[1:]:
+                tmp = self.compileExpression(right, allocate=1)
+                self.append("%s %s, %s, %s" % (operator, dest, dest, tmp))
         return dest
 
     def expressSlice(self, lower, upper):
@@ -930,7 +928,7 @@ class PirateVisitor(object):
         if not node.else_: _elsefor = _endfor
 
         # first get the list
-        forlist = self.compileExpression(node.list)
+        forlist = self.compileExpression(node.list, allocate=1)
         iter = self.gensym()
         self.append("%s = iter %s" % (iter, forlist))
 
@@ -1115,6 +1113,7 @@ class PirateSubVisitor(PirateVisitor):
         self.depth = depth
         self.globals = []
         self.isGenerator = 0
+        self.emptyReturn = None
         
     def getCode(self):
         if self.isGenerator:
@@ -1128,6 +1127,7 @@ class PirateSubVisitor(PirateVisitor):
         self.lines = imclist()
         fallthrou = self.reachable
         self.reachable = True
+
         if self.doc:
             self.append("")
             self.append("# %s" % self.doc, indent=False)
@@ -1138,41 +1138,54 @@ class PirateSubVisitor(PirateVisitor):
             self.append(self.bindLocal(arg, "P%d" % (i+5)))
         self.lines.extend(code)
 
+        if self.emptyReturn:
+            fallthru = True
+            self.label(self.emptyReturn)
+
         if fallthrou:
-            self.append(".return (%s)" % self.lookupName("None"))
+            dest = self.gensym()
+            self.append("new %s, %s" % (dest,self.find_type("PyNone")))
+            self.append(".return (%s)" % dest)
         self.append(".end", indent=False)
         self.append("")
         return "\n".join(self.lines)
 
     def getCodeForGenerator(self):
+        code = self.lines
+        self.lines = imclist()
+        fallthrou = self.reachable
+        self.reachable = True
         
-        stop = ast.Raise(ast.Const("StopIteration"), None, None)
-        self.visit(stop)
-
-        name = self.name
-        res = []
-        if self.doc:
-            res.append("")
-            res.append("# %s" % self.doc)
-
-        res.append(".sub \"%s\" @ANON" % name)
-        label = self.genlabel("gen")
-
-        type = self.gensym("$I")
         gen = self.gensym()
         result = self.gensym()
 
-        res.append("    newsub %s, .Coroutine, %s" % (gen,label))
-        res.append('    find_type %s, "PyGen"' % type)
-        res.append("    new %s, %s" % (result,type))
-        res.append("    setprop %s, 'next', %s" % (result,gen))
+        name = self.name
+        if self.doc:
+            self.append("")
+            self.append("# %s" % self.doc, indent=False)
 
-        res.append("   .return (%s)" % result)
-        res.append(label + ":")
-        res.append("    new_pad -1")
-        res.extend(self.lines)
-        res.append(".end")
-        return "\n".join(res)
+        self.append(".sub \"%s\" @ANON" % name, indent=False)
+        label = self.genlabel("gen")
+
+        self.append("newsub %s, .Coroutine, %s" % (gen,label))
+        self.append("new %s, %s" % (result,self.find_type("PyGen")))
+        self.append("setref %s, %s" % (result,gen))
+
+        self.append(".return (%s)" % result)
+        self.label(label)
+        self.append("new_pad -1")
+        self.lines.extend(code)
+
+        if self.emptyReturn:
+            fallthru = True
+            self.label(self.emptyReturn)
+
+        if fallthrou:
+            stop = ast.Raise(ast.Const("StopIteration"), None, None)
+            self.visit(stop)
+
+        self.append(".end", indent=False)
+        return "\n".join(self.lines)
         
     #def assignToName(self, node, value):
     #    name = node.name
@@ -1189,11 +1202,14 @@ class PirateSubVisitor(PirateVisitor):
             self.globals.append(var)
 
     def visitReturn(self, node):
-        #@TODO: allow both yield and return in one function
-        result = self.compileExpression(node.value, allocate=1)
-        self.append("pop_pad")
-        self.append(".return (" + result + ")")
-        self.reachable = False
+        if isinstance(node.value,ast.Const) and node.value.value == None:
+            self.emptyReturn = self.genlabel("return")
+            self.append("goto %s" % self.emptyReturn)
+        else:
+            result = self.compileExpression(node.value, allocate=1)
+            self.append("pop_pad")
+            self.append(".return (" + result + ")")
+            self.reachable = False
 
     def visitYield(self, node):
         self.isGenerator = 1
