@@ -90,9 +90,9 @@ class PirateTest(unittest.TestCase):
             """
             x = (1 + 2) * 3 - 4
             print x % 3,
-            print 4/2  # @TODO: this returns a float in parrot
+            print 4/2
             """, dump=0)
-        self.assertEquals(res, "2 2.000000\n")
+        self.assertEquals(res, "2 2\n")
 
 
     def test_compare(self):
@@ -581,16 +581,14 @@ class PirateTest(unittest.TestCase):
                 yield 0
                 yield 1
             gen = count()
-            #@TODO: catch StopIteration (uncatchable due to parrot bug)
-            if 1:
-            #try:
+            try:
                 print gen.next(),
                 print gen.next(),
-            #   print gen.next(),
-            #except:
-            #    print 'done'
+                print gen.next(),
+            except:
+                print 'done'
             """, dump=0, lines=0)            
-        self.assertEquals(res, "0 1 ") #done\n")
+        self.assertEquals(res, "0 1 done\n")
 
     def test_microthreads(self):
         res = self.run(            
@@ -600,18 +598,16 @@ class PirateTest(unittest.TestCase):
                 def count():
                     x = 0
                     while 1:                        
-                        yield step
-                        print x
-                        print step + x
-                        #print x+ step
-                        #x = x + step
-                        #x = x + step
+                        yield x
+                        x = x + step
                 return count()
             gs = [make_count(0), make_count(1)]
-            for g in gs:
-                print g.next(),
-            """, dump=1, lines=0)
-        self.assertEquals(res, "0 0 0 1 0 2 0 3")
+            for i in [1,2,3,4]:
+                for g in gs:
+                    print g.next(), 
+
+            """, dump=0, lines=0)
+        self.assertEquals(res, "0 0 0 1 0 2 0 3 ")
             
 ## @TODO: implement iterators (for x in g)
 ## waiting on *.next() for all objects.

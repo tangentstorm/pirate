@@ -68,7 +68,9 @@ class PirateVisitor(object):
 
     def getCode(self):
         res  = ".sub %s\n" % self.name
-        res += "    new_pad %s\n" % self.depth
+        res += "    new_pad 0\n"
+        res += "    newsub P0, .Exception_Handler, __py__catch\n"
+        res += "    set_eh P0\n"
         res += "\n".join(self.lines) + "\n"
         res += ".end\n"
         res += ".include 'pirate.imc'\n\n"
@@ -758,8 +760,11 @@ class PirateVisitor(object):
         assert not isinstance(node.assign, ast.AssTuple), \
                "@TODO: for x,y not implemented yet"
 
+        name = node.assign.name
+        namesym = self.symbol(node.assign.name)
+
         self.set_lineno(node)
-        self.append(".local object %s" % node.assign.name)
+        self.append(".local object %s" % namesym)
         _for = self.symbol("for")
         _endfor = self.symbol("endfor")
         self.loops.append((_for, _endfor))
@@ -778,16 +783,18 @@ class PirateVisitor(object):
 
         # get the next item (also where "continue" jumps to)
         self.append("%(_for)s:" % locals())
-        self.append("%s = %s[%s]" % (node.assign.name, forlist, loopidx))
+        self.append("save %(forlist)s" % locals())
+        self.append("%s = %s[%s]" % (namesym, forlist, loopidx))
 
         value = self.symbol("$P")
-        name = node.assign.name
         self.append("%(value)s = %(forlist)s[%(loopidx)s]" % locals())
         self.append("store_lex -1, '%(name)s', %(value)s"  % locals())
         self.append("%(loopidx)s = %(loopidx)s + 1" % locals())
         
         # do the loop body
         self.visit(node.body)
+
+        self.append("restore %(forlist)s" % locals())
 
         # now loop!
         self.append("if %(loopidx)s < %(listlen)s goto %(_for)s" % locals())
@@ -855,7 +862,9 @@ class PirateVisitor(object):
         self.append(".local object %(msg)s " % locals())        
         self.append("%(ex)s = new Exception " % locals())
         self.compileExpression(node.expr1, msg)
-        self.append("%(ex)s['_message'] = %(msg)s" % locals())
+        sreg = self.symbol("$S")
+        self.append("%(sreg)s = %(msg)s" % locals())
+        self.append("%(ex)s['_message'] = %(sreg)s" % locals())
         self.append("throw %(ex)s" % locals())
 
     def visitAssert(self, node):
@@ -976,7 +985,7 @@ class PirateSubVisitor(PirateVisitor):
         res.append("   .local object gen_fun")
         res.append("   .local object gen_obj")
         res.append("   newsub gen_fun, .Coroutine, %(name)s_g" % locals())
-        res.append("   newclass gen_obj, 'gen_obj'")
+        res.append("   gen_obj = new ParrotObject")
         res.append("   setprop gen_obj, 'next', gen_fun")
         res.append("   .pcc_begin_return")
         res.append("   .return gen_obj")

@@ -75,3 +75,13 @@
     restoreall
     ret
 .end
+
+.sub __py__catch
+    #
+    # top level python exception handler
+    #
+    set S0, P5['_message'] # P5 is the exception object
+    print S0
+    print "\n"
+    end
+.end
