@@ -77,6 +77,13 @@ class PirateVisitor(object):
         for each expression, and so we have to do our
         own dispatching outside the normal visitor walk.
         """
+
+        # in a sub, statements seem to get wrapped in
+        # Stmt. skip it:
+        if isinstance(node, ast.Stmt):
+            self.visit(node)
+            return []
+        
         handler = {
             ast.Name:     self.variableExpression,
             ast.Const:    self.constantExpression,
@@ -94,12 +101,13 @@ class PirateVisitor(object):
             ast.Mul: self.infixExpression,
             ast.Div: self.infixExpression,
             ast.Mod: self.infixExpression,
+
         }
         try:
             return handler[node.__class__](node, dest)
         except KeyError:
             print "## unknown expression:"
-            print expr
+            print node
             print "## entering debugger..."
             print
             import pdb; pdb.set_trace()
@@ -109,6 +117,7 @@ class PirateVisitor(object):
         str: "PerlString",
         int: "PerlInt",
     }
+
 
     def constantExpression(self, expr, dest):
         t = type(expr.value)
@@ -232,11 +241,6 @@ class PirateVisitor(object):
             res.extend(self.expression(arg, var))
             args.append(".arg %s" % var)
 
-
-        
-        ## now call it:
-
-
         # figure out what we're calling
         adr = self.symbol("$I")        
         if isinstance(node.node, ast.Lambda):
@@ -250,6 +254,8 @@ class PirateVisitor(object):
         ret = self.symbol("returnaddr")
         ret_pmc = self.symbol("$P")
 
+        ## now call it:
+
         # @TODO: newsub op not working for me yet
         res.append("%s = new Sub" % sub_pmc)
         res.append("%s = %s" % (sub_pmc, adr))
@@ -257,8 +263,7 @@ class PirateVisitor(object):
         cadr = self.symbol("$I")
         res.append("%s = addr %s" % (cadr, ret))
         res.append("%s = %s" % (ret_pmc, cadr))
-        
-        
+                
         res.append(".pcc_begin non_prototyped")
         res.extend(args)
         res.append('.pcc_call %s, %s' % (sub_pmc, ret_pmc))
@@ -269,8 +274,11 @@ class PirateVisitor(object):
         return res
 
 
-
     def lambdaExpression(self, node, dest, allocate=1):
+        return self.genFunction(node,dest,allocate)
+
+
+    def genFunction(self, node, dest, allocate=1):
         assert not node.kwargs or node.varargs, "only simple args for now"
         self.extend(self.set_lineno(node))
 
@@ -445,6 +453,14 @@ class PirateVisitor(object):
 
     def visitPass(self, node):
         self.append("noop")
+
+    def visitFunction(self, node):  # visitDef
+        self.append(".local object %s" % node.name) #@TODO: use set_lex
+        self.extend(self.genFunction(node, node.name, allocate=1))
+
+
+
+
                 
 
 

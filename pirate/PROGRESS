@@ -19,6 +19,9 @@ y visitPrint(self, node, newline=0):
 y visitPrintnl:
 y visitReturn:
 y visitWhile: # no else clause yet
+y visitPass:
+y visitFunction: # no recursion/closures/nesting yet
+
 
 # e just means it was done in the expression() method
 # instead of its own visitXXX()
@@ -55,7 +58,6 @@ n visitClass:
 n visitDict:
 n visitExec:
 n visitFrom:
-n visitFunction:
 n visitGetattr:
 n visitGlobal:
 n visitImport:
@@ -64,7 +66,6 @@ n visitListComp:
 n visitListCompFor:
 n visitListCompIf(self, node, branch):
 n visitModule:
-n visitPass:
 n visitPower:
 n visitRaise:
 n visitRightShift:

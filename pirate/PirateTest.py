@@ -213,6 +213,30 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "")
 
 
+    def test_def(self):
+        res = self.run(
+            """
+            def f():
+                return 1
+            print f()
+            """, dump=0, lines=1)
+        self.assertEquals(res, "1\n")
+
+## recursion doesn't work yet.
+##     def test_recursion(self):
+##         res = self.run(
+##             """
+##             def f(x):
+##                 if x > 0:
+##                     print x
+##                     return f(x-1)
+##                 else:
+##                     return 0
+##             f(5)
+##             """, dump=1, lines=1)
+##         self.assertEquals(res, "1\n")
+
+
         
 if __name__=="__main__":
     unittest.main()
