@@ -557,7 +557,7 @@ def line_nos(seq):
     return [(i+1, seq[i]) for i in range(len(seq))]
 
 def invoke(src, dump=0, lines=0):
-    i,o = os.popen4("imcc -")
+    i,o = os.popen4("parrot -")
     code = compile(src)
     if dump:
         print
