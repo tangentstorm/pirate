@@ -1,7 +1,6 @@
 
 .sub __main__
     .local Coroutine itr
-    .local object return
     .local object counter
     newsub itr, .Coroutine, _iterator
  
@@ -9,20 +8,16 @@
     zero = new PerlInt
     zero = 0
 
-
     loop:
-        savetop
-        newsub return, .Continuation, return_here
         .pcc_begin non_prototyped
-            .pcc_call itr, return
-             return_here:
-            .result counter
+        .pcc_call itr
+        .result counter
         .pcc_end
 
         print counter
         print " "
       
-        ### zero = 0
+        # zero = 0
         print zero
         print "\n"
 
