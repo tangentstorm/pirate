@@ -1,8 +1,9 @@
 #!/usr/bin/python
 """
 pirate: python->parrot compiler
- usage: pirate.py [-d] filename.py
+ usage: pirate.py [-d] [-t] filename.py
         -d dumps the generated parrot code
+        -t traces the execution of the parrot code
 """
 
 # TODO: change imclist to be aware of var/const differences, take
@@ -233,10 +234,8 @@ class PirateVisitor(object):
             ast.Bitand: self.expressBitwise,
 
             ast.Slice: self.applySlice,
-
-            # leo's patch:
-            #ast.Sub: self.binaryExpression,
         }
+
         try:
             meth = handler[node.__class__]
         except KeyError:
@@ -356,9 +355,9 @@ class PirateVisitor(object):
         return dest
     
     typemap = {
-	str: "S",
-	int: "I",
-	float: "N"
+        str: "S",
+        int: "I",
+        float: "N"
     }
     
     unaryOps = {
@@ -424,11 +423,6 @@ class PirateVisitor(object):
         op = self.infixOps[node.__class__]
         self.append("%s = %s %s %s" % (dest, lside, op, rside))
 
-        # put the result in our destination
-        # (imcc seems to like this as a separate step
-        # for typecasting or something...)
-        #wtf?!
-        #self.append("%s = %s" % (dest, result))
         return dest
 
     compOps = {
@@ -856,10 +850,6 @@ class PirateVisitor(object):
 
     def visitAugAssign(self, aug):
         """tranforms tree to a standard assignment and calls visitAssign
-        
-        @TODO: when Python Objects are available, this should try calling
-        __iadd__ etc first.  It should only do a standard assignment if the
-        object has no __iXXX__ method.
         """
         if isinstance(aug.node, ast.Name):  # e.g. x += 2
             lhs = ast.AssName(aug.node.name, 'OP_ASSIGN')
@@ -1108,7 +1098,6 @@ class PirateVisitor(object):
     def visitClass(self, node):
         name = node.name
         klass = self.gensym()
-        genname = self.genlabel("_" + str(name))
         
         if len(node.bases):
             assert len(node.bases) == 1, "Multiple bases not supported yet"
@@ -1243,15 +1232,6 @@ class PirateSubVisitor(PirateVisitor):
         self.append(".end", indent=False)
         return "\n".join(self.lines)
         
-    #def assignToName(self, node, value):
-    #    name = node.name
-    #    if name in self.globals:
-    #        self.append("store_lex  0, '%s', %s" % (name, value))
-    #    else:
-    #        self.locals[name] = name
-    #        self.append(".local object _py_" + name)
-    #        self.append("_py_%s = %s" % (name, value))
-
 
     def visitGlobal(self, node):
         for var in node.names:
@@ -1305,18 +1285,9 @@ def compile(src, name="__main__"):
 def line_nos(seq):
     return [(i+1, seq[i]) for i in range(len(seq))]
 
-def invoke(src, dump=0, lines=0):
-    i,o = os.popen4("parrot -")
+def invoke(src, trace=0):
+    i,o = os.popen4(trace and "parrot -t -" or "parrot -")
     code = compile(src)
-    if dump:
-        print
-        if lines:
-            for no, line in line_nos(code.split("\n")):
-                print "% 4i: %s" % (no, line)
-        else:
-            print HEAD
-            print code
-            print FOOT
     print >> i, HEAD
     print >> i, code
     print >> i, FOOT
@@ -1329,17 +1300,19 @@ if __name__=="__main__":
 
     if len(sys.argv) > 1:
         # file or stdin?
-	if sys.argv[-1] == '-':
-	    src = sys.stdin.read()
-	else:
-	    src = open(sys.argv[-1]).read()
+        if sys.argv[-1] == '-':
+            src = sys.stdin.read()
+        else:
+            src = open(sys.argv[-1]).read()
+
         # dump or run?
         if "-d" in sys.argv:
             print HEAD
             print compile(src)
             print FOOT
         else:
-            sys.stdout.write(invoke(src))
+            for line in invoke(src, trace=("-t" in sys.argv)):
+                sys.stdout.write(line)
     else:
         print __doc__
         sys.exit()
