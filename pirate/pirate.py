@@ -422,6 +422,7 @@ class PirateVisitor(object):
         ret_pmc = self.gensym("ret_pmc")
 
         ## now call it:
+        self.append("savetop")
         self.append("newsub %s, .Continuation, %s" % (ret_pmc, ret))
         self.append(".pcc_begin non_prototyped")
         for r in args:
@@ -534,22 +535,17 @@ class PirateVisitor(object):
     def visitPrint(self, node):
         assert node.dest is None, "@TODO: print >> not yet handled"
         for n in node.nodes:
-            self.set_lineno(n)
+            arg = self.compileExpression(n, allocate=1)
+            self.append("__py__print(%s,0)" % arg)
+            self.append("print ' '")
             
-            arg = self.gensym('arg')
-            dest = self.compileExpression(n, allocate=1)
-            self.append("%s = %s" % (arg, dest))
-            self.append('.arg 0') # not nested
-            self.append('.arg %s' % arg)
-            self.append('call __py__print')
-            self.append('print " "')
-
 
     def visitPrintnl(self, node):
         self.visitPrint(node)
         if node.nodes:
             self.unappend() # remove final space
         self.append('print "\\n"')
+
 
     def visitIf(self, node):
         _endif = self.genlabel("endif")
@@ -623,7 +619,8 @@ class PirateVisitor(object):
         
         if len(rside)==0 or len(lside)==1:
             # eg, x = []
-            self.assign(lside[0], self.compileExpression(node.expr, allocate=1))
+            self.assign(lside[0],
+                        self.compileExpression(node.expr, allocate=1))
 
         elif (len(lside) == len(rside)):
             ## this works for l=r AND l=r,r,r,r
@@ -747,7 +744,7 @@ class PirateVisitor(object):
 
         # get the next item (also where "continue" jumps to)
         self.append(_for + ":")
-        self.append("if %(loopidx)s >= %(listlen)s goto %(_elsefor)s" % locals())
+        self.append("if %s >= %s goto %s" % (loopidx, listlen, _elsefor))
 
         # Okay: somewhere in our list we might call a generator.
         # Right now generators use parrot Coroutines. Coroutines

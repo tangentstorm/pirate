@@ -1,10 +1,9 @@
 ## pirate standard library
 
-.sub __py__print
-    #
-    # python print routine (special case for lists)
-    # 
-    saveall
+#
+# python print routine (special case for lists)
+# 
+.pcc_sub __py__print non_prototyped
     .param object s
     .param int nested
     typeof $S0, s
@@ -31,9 +30,7 @@
         loop:
             if i >= len goto endloop
             item = s[i]
-            .arg 1 # nested
-            .arg item
-            call __py__print
+            __py__print(item,1)
             i = i + 1
             if i >= len goto endloop
             print ", "
@@ -56,14 +53,10 @@
             unless iter goto enddict
                 shift skey, iter
                 key = skey
-                .arg 1
-                .arg key
-                call __py__print
+                __py__print(key,1)
                 print ": "
                 val = s[skey]
-                .arg 1
-                .arg val
-                call __py__print
+                __py__print(val,1)
             enddict:
                print "}"
             goto done
@@ -72,16 +65,19 @@
         goto done
 
     done:
-    restoreall
-    ret
+    .pcc_begin_return
+    .pcc_end_return
 .end
 
-.sub __py__catch
-    #
-    # top level python exception handler
-    #
+
+#
+# top level python exception handler
+#
+.pcc_sub __py__catch non_prototyped
     set S0, P5['_message'] # P5 is the exception object
     print S0
     print "\n"
     end
+    .pcc_begin_return
+    .pcc_end_return
 .end
