@@ -61,9 +61,8 @@ class PirateVisitor:
 
 
     def visitIf(self, node):
-        #assert len(node.tests) == 1, "Only one test supported"
         _endif = self.symbol("_endif")
-
+        
         for test, body in node.tests:
 
             # if not true, goto _elif
@@ -73,11 +72,12 @@ class PirateVisitor:
             
             # do it and goto _endif
             self.visit(body)
-            self.append("goto %s" % _elif)
+            self.append("goto %s" % _endif)
             
             # _elif: (next test or pass through to else)
             self.append("%s:" % _elif)
-        
+
+        # else:
         if node.else_:
             self.extend(self.set_lineno(node.else_))
             self.visit(node.else_)
