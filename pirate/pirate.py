@@ -661,6 +661,10 @@ class PirateVisitor(object):
         # store the address in dest
         self.append("new %s, %s" % (ref, self.find_type("PyFunc")))
         self.append("set_addr %s, %s" % (ref, sub))
+        if isLambda: 
+            self.append("set %s, '<lambda>'" % ref)
+        elif name: 
+            self.append("set %s, '%s'" % (ref, name))
         for (i, arg) in enumerate(node.argnames):
             self.append("%s[%s] = '%s'" % (ref, i, arg))
 
