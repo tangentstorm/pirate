@@ -102,7 +102,11 @@ class PirateTest(unittest.TestCase):
             """), dump=0)
         self.assertEquals(result, "1 0 1 1 0 1\n")
 
-
+    def test_euclid(self):
+        result = pirate.invoke(open("euclid.py").read(), dump=0)
+        self.assertEquals(result, "96 64\n32\n")
+           
+                                                                    
 if __name__=="__main__":
     unittest.main()
     

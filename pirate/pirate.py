@@ -64,8 +64,7 @@ class PirateVisitor:
         create code to eval expression Node 'expr' and put it in 'dest'
         """
         if isinstance(expr, compiler.ast.Name):
-            return ["%s = new PerlString" % (dest),
-                    "%s = %s #XX" % (dest, expr.name)]
+            return ["%s = %s" % (dest, expr.name)]
         elif isinstance(expr, compiler.ast.Const):
             t = type(expr.value)
             assert t in self.typeMap, "unsupported const type:%s" % t
@@ -207,7 +206,7 @@ class PirateVisitor:
             rightside = [rightside]
         for node, expr in zip(leftside, rightside):
             name = node.name
-            self.append(".local string %s" % name)
+            self.append(".local object %s" % name)
             self.extend(self.expression(expr, name))
 
 
