@@ -16,7 +16,26 @@ usage:  pirate.py [-d] filename.py
 
 import os
 import compiler
+import traceback
 from compiler import ast        
+
+class imclist(list):
+    def append(self, line):
+        if ':' not in line:
+            line = "    %-30s"  %line
+            if "#" not in line:
+                line = line + "# %s"  % self.find_linenumber()
+        super(imclist, self).append(line)
+    def find_linenumber(self):
+        """
+        python black magic. :)
+        """
+        stack = traceback.extract_stack()        
+        file, line, func = stack[-3][:3]
+        if func in ("append", "extend"):
+            file, line, func = stack[-4][:3]
+        return "(%s:%s)" % (func,line)
+
 
 class PirateVisitor(object):
 
@@ -25,10 +44,11 @@ class PirateVisitor(object):
     def __init__(self, name):
         self.name = name
         self._last_lineno = None
-        self.lines = []
+        self.lines = imclist()
         self.loops = []
         self.counter = {}
         self.subs = []
+        self.vars = {}
 
     def symbol(self, prefix):
         """
@@ -51,21 +71,22 @@ class PirateVisitor(object):
         if (node.lineno is not None and
             node.lineno != self._last_lineno):
             self._last_lineno = node.lineno
-            return ['setline %i' % node.lineno]
+            res = imclist()
+            res.append('setline %i' % node.lineno)
+            return res
         else:
             return []
 
     def append(self, line):
-        if ':' not in line:
-            line = '    ' + line
         self.lines.append(line)
+
 
     def unappend(self):
         self.lines.pop()
         
     def extend(self, lines):
         for line in lines:
-            self.append(line)
+            self.lines.append(line)
 
 
     ##[ expression compiler ]######################################
@@ -86,7 +107,7 @@ class PirateVisitor(object):
             return []
         
         handler = {
-            ast.Name:     self.variableExpression,
+            ast.Name:     self.nameExpression,
             ast.Const:    self.constantExpression,
             ast.List:     self.listExpression,
             ast.Lambda:   self.lambdaExpression,
@@ -102,7 +123,6 @@ class PirateVisitor(object):
             ast.Mul: self.infixExpression,
             ast.Div: self.infixExpression,
             ast.Mod: self.infixExpression,
-
         }
         try:
             return handler[node.__class__](node, dest)
@@ -123,11 +143,16 @@ class PirateVisitor(object):
     def constantExpression(self, expr, dest):
         t = type(expr.value)
         assert t in self.constMap, "unsupported const type:%s" % t
-        return [("%s = new %s" % (dest, self.constMap[t])),
-                ("%s = %s" % (dest, repr(expr.value)))]
+        res = imclist()
+        res.append("%s = new %s" % (dest, self.constMap[t]))
+        res.append("%s = %s" % (dest, repr(expr.value)))
+        return res
 
-    def variableExpression(self, expr, dest):
-        return ["%s = %s" % (dest, expr.name)]
+
+    def nameExpression(self, expr, dest):
+        res = imclist()
+        res.append("%s = %s" % (dest, expr.name))
+        return res
 
 
     def listExpression(self, expr, dest):
@@ -138,7 +163,6 @@ class PirateVisitor(object):
             res.append("push %s, %s" % (dest, sym))
         return res
         
-
 
     infixOps = {
         ast.Add: "+",
@@ -157,7 +181,7 @@ class PirateVisitor(object):
         symleft,  typleft  = self.symbol("$P"), "PerlInt"
         symright, typright = self.symbol("$P"), "PerlInt"
         symexpr,  typexpr  = self.symbol("$P"), "PerlInt"
-        res = []
+        res = imclist()
 
         # store left side of expression in symleft:
         res.append("%s = new %s" % (symleft, typleft))
@@ -181,7 +205,7 @@ class PirateVisitor(object):
 
     def compareExpression(self, expr, dest):
         assert len(expr.ops) == 1, "multi-compare not working yet"
-        res = []       
+        res = imclist()       
         # get left side:
         symL = self.symbol("$P")
         res.extend(self.expression(expr.expr, symL))
@@ -215,7 +239,7 @@ class PirateVisitor(object):
 
     def logicExpression(self, expr, dest):
         operator = self.logicOps[expr.__class__]
-        res = []
+        res = imclist()
         if operator == "!":            
             res.extend(self.expression(expr.expr, dest))
             res.append("not %s, %s" % (dest,dest))
@@ -233,7 +257,7 @@ class PirateVisitor(object):
         assert not (node.star_args or node.dstar_args), \
                "f(*x,**y) not working yet"
         
-        res = []
+        res = imclist()
         args = []
         node.args.reverse()
         for arg in node.args:
@@ -458,8 +482,6 @@ class PirateVisitor(object):
     def visitFunction(self, node):  # visitDef
         self.append(".local object %s" % node.name) #@TODO: use set_lex
         self.extend(self.genFunction(node, node.name, allocate=1))
-
-
 
 
                 

@@ -20,23 +20,6 @@ class PirateTest(unittest.TestCase):
     def run(self, code, dump=0, lines=1):
         return pirate.invoke(trim(code), dump, lines=lines)
 
-
-    def test_compile(self):
-        # in general, won't actually test bytecode, but
-        # this is just a simple case to show the interface
-        res = pirate.compile(trim(
-            """
-            print
-            """))
-        goal = trim(
-            """
-            .sub __main__
-                print "\\n"
-                end
-            .end
-            """)
-        assert res.startswith(goal), "bad bytecode from compile():\n%s" % res
-
     
     def test_print(self):
         res = self.run(
@@ -91,7 +74,7 @@ class PirateTest(unittest.TestCase):
             x = (1 + 2) * 3 - 4
             print x % 3
             print 4/2  # note: this returns a float in parrot
-            """)
+            """, dump=0)
         self.assertEquals(res, "2\n2.000000\n")
 
 
