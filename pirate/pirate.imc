@@ -6,10 +6,20 @@
     # 
     saveall
     .param object s
+    .param int nested
     typeof $S0, s
     if $S0 == "PerlArray" goto list
-        print s
-        goto endif
+    if $S0 == "PerlHash" goto dict
+        unless $S0 == "PerlString" goto noquote
+        if nested goto quote
+        noquote:
+            print s
+            goto done
+        quote:
+            print "'"
+            print s
+            print "'"
+        goto done
     list:
         .local int len
         .local int i
@@ -21,6 +31,7 @@
         loop:
             if i >= len goto endloop
             item = s[i]
+            .arg 1 # nested
             .arg item
             call __py__print
             i = i + 1
@@ -29,7 +40,38 @@
             goto loop
         endloop:
         print "]"
-    endif:
+        goto done
+
+    dict:
+        unless s goto empty
+            .local object iter
+            .local object key
+            .local object val
+            .local string skey
+            key = new PerlString
+
+            print "{"
+            iter = new Iterator, s
+            iter = 0  # reset it 
+            unless iter goto enddict
+                shift skey, iter
+                key = skey
+                .arg 1
+                .arg key
+                call __py__print
+                print ": "
+                val = s[skey]
+                .arg 1
+                .arg val
+                call __py__print
+            enddict:
+               print "}"
+            goto done
+        empty:
+            print "{}"
+        goto done
+
+    done:
     restoreall
     ret
 .end
