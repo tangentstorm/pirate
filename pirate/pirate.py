@@ -830,8 +830,11 @@ class PirateVisitor(object):
             elif (len(lside) == len(rside)):
                 ## this works for l=r AND l=r,r,r,r
                 ## because of AssTuple nodes :)
-                for node, expr in zip(lside, rside):
-                    self.assign(node, self.compileExpression(expr, allocate=1))
+                temp = []
+                for expr in rside:
+                    temp.append(self.compileExpression(expr, allocate=1))
+                for i, node in enumerate(lside):
+                    self.assign(node, temp[i])
     
             elif len(rside)==1:
                 ## this handles l,l,l=r and l,l,l=r()
