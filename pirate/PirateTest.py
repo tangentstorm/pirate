@@ -374,11 +374,11 @@ class PirateTest(unittest.TestCase):
             """
             try:
                 print 'parrot',
-                raise hell
+                raise 'hell'
                 print 'dropped the ball'
             except:
                 print 'caught it!'
-            """, dump=1)
+            """, dump=0)
         self.assertEquals(res, "parrot caught it!\n")
 
 
