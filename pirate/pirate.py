@@ -1,16 +1,7 @@
 #!/usr/bin/python
 """
 pirate: python->parrot compiler
-
-loosely based on parrot-gen.py by amk:
-http://www.amk.ca/conceit/parrot.html
-
-"""
-__doc__=\
-"""
-pirate: python to parrot compiler 
-
-usage:  pirate.py [-d] filename.py
+ usage: pirate.py [-d] filename.py
         -d dumps the generated parrot code
 """
 
