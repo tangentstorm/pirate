@@ -2,13 +2,15 @@
 Many thanks to:
 
  A.M. Kuchling ( http://www.amk.ca/ )
-    wrote the original parrot-gen.py
+    for the original parrot-gen.py
 
  Terry Reedy
     laid out refactoring plan for self.expression()
 
  Leopold Toetsch
-    for tons of great advice with imcc (and for imcc!)
+    for tons of great advice with imcc, numerous 
+    optimizations, showing how to do type inference, 
+    and delivering parrot patches so fast my head spins. :)
 
  Luke Palmer
     for imcc and subroutine advice and optimization tips
@@ -17,10 +19,18 @@ Many thanks to:
     suggested the PyObject<->PMC wrapper layer concept
 
  Klass-Jan Stol ( http://members.home.nl/joeijoei/parrot/ )
-    let me steal the name from his lua-to-parrot compiler :)
+    for letting me steal the name from his lua-to-parrot 
+    compiler, writing an extremely informative report, and
+    working with me on the s-expression compiler.
 
  Dan Sugalski ( http://www.sidhe.org/~dan/blog/ )
-    for the "What the heck is..." category in his blog
+    for the "What the heck is..." category in his blog,
+    leading the parrot project, and for the pie-thon
+    challenge, even if the terms say he can't use this
+    code. :)
+
+ Ole Martin Bjorndalen ( http://www.cs.uit.no/~olemb/ )
+    for readlisp.py
 
 
 Whoever wrote the python compiler package :)
