@@ -74,8 +74,8 @@ class PirateVisitor(object):
         res += ".include 'pirate.imc'\n\n"
         res += "\n\n".join([s.getCode() for s in self.subs]) + "\n"
         return res
-    
-    def imcObject(self, name):
+
+    def imcObject(self, name, type=None):
         symbol = self.symbol(name)
         self.append(".local object %(symbol)s" % locals())
         self.append("%(symbol)s = new PerlUndef" % locals())
@@ -422,6 +422,8 @@ class PirateVisitor(object):
         if isinstance(node.node, ast.Lambda):
             # lambdas don't have names!
             self.lambdaExpression(node.node, sub_pmc, allocate=0)
+        elif isinstance(node.node, ast.Getattr):
+            self.compileExpression(node.node, sub_pmc)
         else:
             sub = node.node.name
             self.append("find_lex %s, '%s'" % (sub_pmc, sub)) 
@@ -757,21 +759,18 @@ class PirateVisitor(object):
         # (not as part of a larger expression or assignment)
         self.callingExpression(node, dest=None, allocate=0)
 
-    def visitReturn(self, node):
-        _res= self.symbol("res")
-        self.append(".local object %s" % _res)
-        self.compileExpression(node.value, _res)
-        self.append("pop_pad")
-        self.append(".pcc_begin_return")
-        self.append(".return %s" % _res)
-        self.append(".pcc_end_return")
-
     def visitPass(self, node):
         self.append("noop")
 
     def visitFunction(self, node):  # visitDef
         self.genFunction(node, node.name, allocate=1)
 
+    def visitReturn(self, node):
+        raise SyntaxError, "return outside of function"
+
+    def visitYield(self, node):
+        raise SyntaxError, "yield outside of function"
+        
                 
     ##[ exceptions ]####################################################
 
@@ -864,33 +863,83 @@ class PirateSubVisitor(PirateVisitor):
         self.counter = counter
         self.depth = depth
         self.globals = []
+        self.isGenerator = 0
         
     def getCode(self):
-        res = ""
+        if self.isGenerator:
+            res = self.getCodeForGenerator()
+        else:
+            res = self.getCodeForFunction()
+        return res + "\n\n".join([s.getCode() for s in self.subs])
+
+    def getCodeForFunction(self):
+        res = []
         if self.doc:
-            res += "# %s\n" % self.doc
-        res  += ".pcc_sub %s non_prototyped\n" % self.name
+            res.append("# %s" % self.doc)
+        res.append(".pcc_sub %s non_prototyped" % self.name)
         for arg in self.args:
-            res += "    .param object %s\n" % arg
-        res += "    new_pad %s\n" % self.depth
+            res.append("    .param object %(arg)s" % locals())
+        res.append("    new_pad %s" % self.depth) #@TODO: use -1 here??
         for arg in self.args:
-            res += "    store_lex -1, '%s', %s\n" % (arg,arg)
-        res += "\n".join(self.lines) + "\n"
-        res += "    .local object None\n"
-        res += "    None = new PerlString\n"  #@TODO: .PythonNone
-        res += "    None = 'None'\n"
-        res += "    .pcc_begin_return\n"
-        res += "    .return None\n"
-        res += "    .pcc_end_return\n"
-        res += ".end\n\n"
-        res += "\n\n".join([s.getCode() for s in self.subs])
-        return res
+            res.append("    store_lex -1, '%(arg)s', %(arg)s" % locals())
+        res.extend(self.lines)
+        res.append("    .local object None")
+        res.append("    None = new PerlString")  #@TODO: .PythonNone
+        res.append("    None = 'None'")
+        res.append("    .pcc_begin_return")
+        res.append("    .return None")
+        res.append("    .pcc_end_return")
+        res.append(".end")
+        return "\n".join(res)
+
+    def getCodeForGenerator(self):
+        stop = ast.Raise(ast.Const("StopIteration"), None, None)
+        self.visit(stop)
+
+        name = self.name
+        res = []
+        res.append(".pcc_sub %(name)s" % locals())
+        res.append("   .local object gen_fun")
+        res.append("   .local object gen_obj")
+        res.append("   newsub gen_fun, .Coroutine, %(name)s_g" % locals())
+        res.append("   newclass gen_obj, 'gen_obj'")
+        res.append("   setprop gen_obj, 'next', gen_fun")
+        res.append("   .pcc_begin_return")
+        res.append("   .return gen_obj")
+        res.append("   .pcc_end_return")
+        res.append(".end")
+        res.append(".pcc_sub %(name)s_g" % locals())
+        res.append("   new_pad -1")
+        res.extend(self.lines)
+        res.append(".end")
+        return "\n".join(res)
     
     def visitGlobal(self, node):
         for var in node.names:
             self.globals.append(var)
 
+    def visitReturn(self, node):
+        #@TODO: allow both yield and return in one function
+        result = self.imcObject("res")
+        self.compileExpression(node.value, result)
+        self.append("pop_pad")
+        self.append(".pcc_begin_return")
+        self.append(".return %(result)s" % locals())
+        self.append(".pcc_end_return")
 
+    def visitYield(self, node):
+        # @TODO: any way to consolidate this with return?
+        self.isGenerator = 1
+        res = self.imcObject("res")
+        self.compileExpression(node.value, res)
+        self.append("saveall")
+        self.append("pop_pad")
+        self.append(".pcc_begin_yield")
+        self.append(".return %(res)s" % locals())
+        self.append(".pcc_end_yield")
+        self.append("restoreall")
+        
+        
                 
 ## module interface ###############################################
 

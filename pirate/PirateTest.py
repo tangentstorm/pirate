@@ -513,6 +513,30 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "Lexical 'hell' not found\n")
 
 
+    ## generators and iterators ##################
+
+    def test_generator(self):
+        res = self.run(
+            """
+            from __future__ import generators #@TODO: 2.3
+            def count():
+                yield 0
+                yield 1
+                    
+            gen = count()
+            print gen.next(),
+            print gen.next(),
+            print gen.next(),
+            """, dump=0, lines=1)
+        self.assertEquals(res, "0 1 StopIteration\n")
+
+## @TODO: implement iterators (for x in g)
+## waiting on *.next() for all objects.
+## otherwise, we have to write special case code
+##
+##     def test_iterator(self): 
+##         pass
+
 
     ## object oriented stuff #####################
 

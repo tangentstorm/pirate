@@ -37,6 +37,7 @@ y visitRaise:    # single argument only
 y visitAssert:
 y visitTryExcept:  # single handler, no storing the object, no else
 y visitTryFinally: # also, exception handlers persist (clear_eh op dumps core)
+y visitYield:      # but no iterators: g.next() works, for y in g() doesn't
 
 
 # e just means it was done in the expression() method
@@ -89,10 +90,6 @@ n visitAugGetattr(self, node, mode):
 n visitClass:
 n visitAssAttr:
 n visitGetattr:
-
-
-## generators ############
-n visitYield:
 
 
 ## slices ################
