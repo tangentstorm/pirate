@@ -36,6 +36,7 @@ class imclist(list):
         """
         python black magic. :)
         """
+        #@TODO: use inspect.stack() to get locals()?
         stack = traceback.extract_stack()        
         file, line, func = stack[-3][:3]
         if func == "append":
@@ -94,7 +95,7 @@ class PirateVisitor(object):
 
     ##[ expression compiler ]######################################
     
-    def compileExpression(self, node, dest):
+    def compileExpression(self, node, dest, allocate=1):
         """
         In CPython, expression results just get pushed
         onto the stack. But since parrot uses registers
@@ -111,9 +112,10 @@ class PirateVisitor(object):
         
         handler = {
             # new stye: return their own dest
-            ast.Const:    self.expressConstant,
-
-            ast.ListComp: self.expressListComp,
+            ast.Const:     self.expressConstant,
+            ast.Dict:      self.expressDict,
+            ast.Subscript: self.expressSubscript,
+            ast.ListComp:  self.expressListComp,
             
             # old style (return nothing)
             ast.Name:     self.nameExpression,
@@ -137,7 +139,7 @@ class PirateVisitor(object):
             #ast.Sub: self.binaryExpression,
         }
         try:
-            return handler[node.__class__](node, dest)
+            return handler[node.__class__](node, dest, allocate)
         except KeyError:
             print "## unknown expression:"
             print node
@@ -152,25 +154,61 @@ class PirateVisitor(object):
     }
 
 
-    def expressConstant(self, expr, dest):
-        t = type(expr.value)
+    def expressConstant(self, node, dest, allocate):
+        t = type(node.value)
         assert t in self.constMap, "unsupported const type:%s" % t
         if dest:
-            self.append("%s = new %s" % (dest, self.constMap[t]))
-            self.append("%s = %s" % (dest, repr(expr.value)))
+            if allocate:
+                self.append("%s = new %s" % (dest, self.constMap[t]))
+            self.append("%s = %s" % (dest, repr(node.value)))
             return dest
         else:
-            return expr.value
+            return node.value
 
 
-    def nameExpression(self, expr, dest):
-        #if expr.name in self.vars:
+    def expressDict(self, node, dest, allocate):
+        self.set_lineno(node)
+        self.append("%(dest)s = new PerlHash" % locals())
+        if node.items:
+            key = self.symbol("key")
+            val = self.symbol("val")
+            self.append(".local Key %(key)s" % locals())
+            self.append(".local object %(val)s" % locals())
+            for k,v in node.items:
+                self.append("%(key)s = new Key"  % locals())
+                self.compileExpression(k, key, allocate=0)
+                self.compileExpression(v, val)
+                self.append("%(dest)s[%(key)s] = %(val)s" % locals())
+        return dest
+
+
+    def expressSubscript(self, node, dest, allocate):
+        assert len(node.subs) == 1, "huh? multiple subscripts?" # huh?
+        
+        dict = self.symbol("dict")
+        self.append(".local object %(dict)s" % locals())
+        self.compileExpression(node.expr, dict, allocate=0)
+        
+        subs = self.symbol("subs")
+        self.append(".local object %(subs)s" % locals())
+        self.append("%(subs)s = new Key" % locals())
+        assert len(node.subs) == 1
+        self.compileExpression(node.subs[0], subs, allocate=0)
+
+        slot = "%(dict)s[%(subs)s]" % locals()
+        
+        if dest:
+            self.append("%(dest)s = %(slot)s" % locals())
+            return dest
+        else:
+            return slot
+    
+        
+    def nameExpression(self, expr, dest, allocate):
         self.append("find_lex %s, '%s'" % (dest, expr.name))
-        #else:
-        #    self.append("%s = %s" % (dest, expr.name))
 
 
-    def listExpression(self, expr, dest):
+    def listExpression(self, expr, dest, allocate):
         self.append("%(dest)s = new PerlArray" % locals())
         sym = self.symbol("$P")
         for item in expr.nodes:
@@ -182,7 +220,7 @@ class PirateVisitor(object):
 	int: "I",
 	float: "N"
     }
-    def binaryExpression(self, node, dest):
+    def binaryExpression(self, node, dest, allocate):
         #@TODO: this isn't used yet (because it doesn't work
         # for all nodes and requires some refactoring) It's
         # leo's code for type inference... Probably ought
@@ -241,7 +279,7 @@ class PirateVisitor(object):
     }
 
         
-    def infixExpression(self, node, dest):
+    def infixExpression(self, node, dest, allocate):
         operator = self.infixOps[node.__class__]
         symleft  = self.symbol("$P")
         symright = self.symbol("$P")
@@ -264,7 +302,7 @@ class PirateVisitor(object):
         self.append("%s = %s" % (dest, symexpr))
     
 
-    def compareExpression(self, expr, dest):
+    def compareExpression(self, expr, dest, allocate):
         assert len(expr.ops) == 1, "multi-compare not working yet"
 
         # get left side:
@@ -297,7 +335,7 @@ class PirateVisitor(object):
     }
 
 
-    def logicExpression(self, expr, dest):
+    def logicExpression(self, expr, dest, allocate):
         operator = self.logicOps[expr.__class__]
 
         if operator == "!":            
@@ -312,7 +350,7 @@ class PirateVisitor(object):
             self.append("%s %s, %s, %s" % (operator, dest, dest, tmp))
 
 
-    def callingExpression(self, node, dest):
+    def callingExpression(self, node, dest, allocate):
         assert not (node.star_args or node.dstar_args), \
                "f(*x,**y) not working yet"
         
@@ -410,7 +448,7 @@ class PirateVisitor(object):
             self.expr = expr
             self.pmc = pmc
 
-    def expressListComp(self, node, dest):
+    def expressListComp(self, node, dest, allocate):
         self.set_lineno(node)
         lcval = self.symbol("$P")
         self.append("%(dest)s = new PerlArray" % locals())
@@ -454,6 +492,7 @@ class PirateVisitor(object):
             self.set_lineno(n)
             dest = self.symbol("$P")
             self.compileExpression(n, dest)
+            self.append('.arg 0') # not nested
             self.append('.arg %s' % dest)
             self.append('call __py__print')
             self.append('print " "')
@@ -476,17 +515,17 @@ class PirateVisitor(object):
             _elif = self.symbol("elif")
             testvar = self.symbol("test")
 
-            self.append(".local object %s" % testvar)
-            self.append("%s = new PerlInt" % testvar)
+            self.append(".local object %(testvar)s" % locals())
+            self.append("%(testvar)s = new PerlInt" % locals())
             self.compileExpression(test, testvar)
-            self.append("unless %s goto %s" % (testvar, _elif))
+            self.append("unless %(testvar)s goto %(_elif)s" % locals())
             
             # do it and goto _endif
             self.visit(body)
-            self.append("goto %s" % _endif)
+            self.append("goto %(_endif)s" % locals())
             
             # _elif: (next test or pass through to else)
-            self.append("%s:" % _elif)
+            self.append("%(_elif)s:" % locals())
 
         # else:
         if node.else_:
@@ -494,7 +533,7 @@ class PirateVisitor(object):
             self.visit(node.else_)
             
         # _endif:
-        self.append("%s:" % _endif)
+        self.append("%(_endif)s:" % locals())
 
 
     def visitAssign(self, node):
@@ -504,26 +543,36 @@ class PirateVisitor(object):
         or isinstance(leftside, ast.AssList):
             leftside = leftside.nodes
             rightside = rightside.nodes
-        elif isinstance(leftside, ast.AssName):
+        elif isinstance(leftside, ast.AssName) \
+          or isinstance(leftside, ast.Subscript): 
             leftside = [leftside]
             rightside = [rightside]
         else:
             raise NotImplementedError, \
-                  "don't how to handle %s" % node.__class__.__name__
+                  "don't how to handle %s" % leftside.__class__.__name__
             
         for node, expr in zip(leftside, rightside):
-            name = node.name
 
-            #@TODO: get rid of local object nonsense here...
-            if isinstance(expr, ast.Lambda):
-                self.compileExpression(expr, name)
+            if isinstance(node, ast.Subscript):
+
+                slot = self.expressSubscript(node, dest=None, allocate=0)
+                value = self.symbol("value")
+                self.append(".local object %(value)s" % locals())                
+                self.compileExpression(expr, value)
+                self.append("%(slot)s = %(value)s" % locals())
+
             else:
-                self.append(".local object %s" % name)
-                self.compileExpression(expr, name)
-                if name in self.globals:
-                    self.append("store_lex  0, '%s', %s" % (name,name))
+                name = node.name
+                #@TODO: get rid of local object nonsense here...
+                if isinstance(expr, ast.Lambda):
+                    self.compileExpression(expr, name)
                 else:
-                    self.append("store_lex -1, '%s', %s" % (name,name))
+                    self.append(".local object %s" % name)
+                    self.compileExpression(expr, name)
+                    if name in self.globals:
+                        self.append("store_lex  0, '%s', %s" % (name,name))
+                    else:
+                        self.append("store_lex -1, '%s', %s" % (name,name))
 
 
     def visitWhile(self, node):
@@ -603,7 +652,7 @@ class PirateVisitor(object):
     def visitCallFunc(self, node):
         # visited when a function is called as a subroutine
         # (not as part of a larger expression or assignment)
-        self.callingExpression(node, dest=None)
+        self.callingExpression(node, dest=None, allocate=0)
 
     def visitReturn(self, node):
         _res= self.symbol("res")
@@ -618,9 +667,23 @@ class PirateVisitor(object):
         self.append("noop")
 
     def visitFunction(self, node):  # visitDef
-        #self.append(".local object %s" % node.name) #@TODO: use set_lex
         self.genFunction(node, node.name, allocate=1)
                 
+    ## exceptions #########################
+
+    def visitRaise(self, node):
+        assert node.expr1, "argument required for raise"
+        assert not (node.expr2 or node.expr3), "only 1 arg alllowed for raise"
+        self.set_lineno(node)
+        ex = self.symbol("ex")
+        msg = self.symbol("msg")
+        self.append(".local object %(ex)s " % locals())
+        self.append(".local object %(msg)s " % locals())        
+        self.append("%(ex)s = new Exception " % locals())
+        self.compileExpression(node.expr1, msg)
+        self.append("%(ex)s['_message'] = %(msg)s" % locals())
+        self.append("throw %(ex)s" % locals())
+
 
 
 class PirateSubVisitor(PirateVisitor):
@@ -666,7 +729,7 @@ class PirateSubVisitor(PirateVisitor):
             self.globals.append(var)
 
 
-        
+                
 ## module interface ###############################################
 
 def compile(src):

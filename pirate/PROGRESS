@@ -9,9 +9,9 @@
 # export TOTAL=`grep -E "^[yehn]" PROGRESS | wc -l`
 
 ## these are done ###############################
-y visitAssign:
+y visitAssign: 
 y visitBreak:
-y visitCallFunc:
+y visitCallFunc: # no */** args yet
 y visitContinue:
 y visitFor:      # no "else" clause yet
 y visitIf:
@@ -30,7 +30,10 @@ y visitAssList:  # in visitAssign
 y visitGlobal:
 y visitListComp:
 y visitListCompFor:
-y visitListCompIf(self, node, branch):
+y visitListCompIf:
+y visitDict:     # string keys only (because of PerlHash)
+y visitSubscript:
+y visitRaise:    # single argument only
 
 
 # e just means it was done in the expression() method
@@ -68,13 +71,18 @@ n visitFloorDiv:
 n visitInvert:
 
 
-## dictionaries ##########
-n visitDict:
-n visitSubscript(self, node, aug_flag=None):
+## exceptions ############
+n visitAssert:
+n visitTryExcept:
+n visitTryFinally:
+
+
+## keyword arguments #####
 n visitKeyword: keyword arguments (on calling side)
 
 
 ## assignments ###########
+n delete ( OP_DELETE in assign )
 n visitAugAssign:
 n visitAugName(self, node, mode):
 n visitAugSubscript(self, node, mode):
@@ -85,13 +93,6 @@ n visitClass:
 n visitAssAttr:
 n visitAugGetattr(self, node, mode):
 n visitGetattr:
-
-
-## exceptions ############
-n visitAssert:
-n visitTryExcept:
-n visitTryFinally:
-n visitRaise:
 
 
 ## generators ############

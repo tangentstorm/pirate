@@ -189,6 +189,7 @@ class PirateTest(unittest.TestCase):
             print [], [1], [1,2,3], [[],[4],[]]
             """)
         self.assertEquals(res, "[] [1] [1, 2, 3] [[], [4], []]\n")
+        
 
     def test_tuple(self):
         #@TODO: make tuples be tuples once there's a .PythonTuple
@@ -197,7 +198,18 @@ class PirateTest(unittest.TestCase):
             print (1,2,(3,4),5)            
             """)
         self.assertEquals(res, "[1, 2, [3, 4], 5]\n")
-        
+
+
+    def test_dict(self):
+        res = self.run(
+            """
+            print {}, {'a':'b'},
+            d = {'x':'c'}
+            d['y'] = 'z'
+            print d['x'], d['y']
+            """, dump=0, lines=0)
+        self.assertEquals(res, "{} {'a': 'b'} c z\n")
+            
             
     ## function-related stuff ####################
 
@@ -316,12 +328,12 @@ class PirateTest(unittest.TestCase):
 
     ## list comprehensions #######################
 
-    def test_listcomp(self):
+    def test_simple_listcomp(self):
         res = self.run(
             """
             print [x for x in ['c','a','t'] if x !='c']
             """, dump=0)
-        self.assertEquals(res, "[a, t]\n") #@TODO: quote strings
+        self.assertEquals(res, "['a', 't']\n")
 
 
     def test_listcomp(self):
@@ -333,6 +345,21 @@ class PirateTest(unittest.TestCase):
                         if x < 7]
             """, dump=0)
         self.assertEquals(res, "[15, 25, 16, 26]\n")
+
+
+    ## exceptions ################################
+
+    def test_raise(self):
+        res = self.run(
+            """
+            print 'to be or',
+            raise hell
+            print 'not to be'
+            """, dump=0)
+        # the error message shows up on stderr
+        # @TODO: top-level pythonic exception handler
+        self.assertEquals(res, "to be or Lexical 'hell' not found")
+            
 
 
 if __name__=="__main__":
