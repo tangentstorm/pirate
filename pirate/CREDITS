@@ -7,6 +7,21 @@ Many thanks to:
  Terry Reedy
     laid out refactoring plan for self.expression()
 
+ Leopold Toetsch
+    for tons of great advice with imcc (and for imcc!)
+
+ Luke Palmer
+    for imcc and subroutine advice and optimization tips
+
+ Joe Ryan
+    suggested the PyObject<->PMC wrapper layer concept
+
+ Klass-Jan Stol ( http://members.home.nl/joeijoei/parrot/ )
+    let me steal the name from his lua-to-parrot compiler :)
+
+ Dan Sugalski ( http://www.sidhe.org/~dan/blog/ )
+    for the "What the heck is..." category in his blog
+
 
 Whoever wrote the python compiler package :)
  

@@ -66,6 +66,9 @@ to work with the new intermediate code compiler
       and Objective-C.
       """
 
+      Also, ponie seems to be doing the same for
+      perl5/XS, and XS is a lot stranger than PyObject.
+
 
 ## cvs access ####################################
 
