@@ -684,6 +684,13 @@ class PirateVisitor(object):
         self.append("%(ex)s['_message'] = %(msg)s" % locals())
         self.append("throw %(ex)s" % locals())
 
+    def visitAssert(self, node):
+        # another tree transformation:
+        self.visit( ast.If(
+            tests = [(ast.Not(node.test),
+                      ast.Raise(node.fail, None, None))],
+            else_ = None ))
+        
 
 
 class PirateSubVisitor(PirateVisitor):

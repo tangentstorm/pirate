@@ -34,6 +34,7 @@ y visitListCompIf:
 y visitDict:     # string keys only (because of PerlHash)
 y visitSubscript:
 y visitRaise:    # single argument only
+y visitAssert:
 
 
 # e just means it was done in the expression() method
@@ -45,7 +46,7 @@ e visitAnd:
 e visitCompare:
 e visitConst:
 e visitDiv:
-e visitMod:
+e visitMod:      # but no string interpolation of course
 e visitMul:
 e visitName:
 e visitNot:
@@ -72,7 +73,6 @@ n visitInvert:
 
 
 ## exceptions ############
-n visitAssert:
 n visitTryExcept:
 n visitTryFinally:
 
@@ -82,7 +82,7 @@ n visitKeyword: keyword arguments (on calling side)
 
 
 ## assignments ###########
-n delete ( OP_DELETE in assign )
+n del ( OP_DELETE in assign )
 n visitAugAssign:
 n visitAugName(self, node, mode):
 n visitAugSubscript(self, node, mode):

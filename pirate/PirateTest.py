@@ -348,17 +348,26 @@ class PirateTest(unittest.TestCase):
 
 
     ## exceptions ################################
-
+    # @TODO: top-level pythonic exception handler
+    
     def test_raise(self):
         res = self.run(
             """
             print 'to be or',
-            raise hell
-            print 'not to be'
+            raise 'not to be'
+            print 'what was the question?'
             """, dump=0)
         # the error message shows up on stderr
-        # @TODO: top-level pythonic exception handler
-        self.assertEquals(res, "to be or Lexical 'hell' not found")
+        self.assertEquals(res, "to be or not to be\n")
+            
+    def test_assert(self):
+        res = self.run(
+            """
+            assert 1, 'oh cool'
+            assert 0, 'aw crap'
+            print 'do not enter'
+            """, dump=0)
+        self.assertEquals(res, "aw crap\n")
             
 
 
