@@ -32,11 +32,11 @@ class imclist(list):
     as a comment.
     """
     
-    def append(self, line):
+    def append(self, line, indent=True):
         is_setline = line.startswith("setline")
-        if (':' not in line) or (' ' in line):
+        if indent:
             line = "    %-30s"  %line
-            if "#" not in line:
+            if not line.isspace():
                 if not is_setline: # work round IMCC parsing bug
                     line = line + "# %s"  % self.find_linenumber()
         super(imclist, self).append(line)
@@ -116,16 +116,16 @@ class PirateVisitor(object):
             self.append('setline %i' % node.lineno)
 
 
-    def append(self, line):
+    def append(self, line, indent=True):
         if self.reachable:
-            self.lines.append(line)
+            self.lines.append(line, indent)
 
     def unappend(self):
         self.lines.pop()
         
     def label(self, name):
         self.reachable = True
-        self.append("%s:" % name)
+        self.append("%s:" % name, indent=False)
         self.types = {}
         self.locals = {}
 
@@ -1071,27 +1071,30 @@ class PirateSubVisitor(PirateVisitor):
         return res + "\n\n".join([s.getCode() for s in self.subs])
 
     def getCodeForFunction(self):
-        res = []
+        code = self.lines
+        self.lines = imclist()
+        self.reachable = True
         if self.doc:
-            res.append("")
-            res.append("# %s" % self.doc)
-        res.append(".sub %s @ANON" % self.name)
+            self.append("")
+            self.append("# %s" % self.doc, indent=False)
+        self.append(".sub %s @ANON" % self.name, indent=False)
         for arg in self.args:
-            res.append("    .param object " + arg)
-        res.append("    new_pad %s" % self.depth) #@TODO: use -1 here??
+            self.append(".param object " + arg)
+        self.append("new_pad %s" % self.depth) #@TODO: use -1 here??
         
-        res.extend([self.bindLocal(arg, arg) for arg in self.args])
-        res.extend(self.lines)
-        res.append("    #------")
+        for arg in self.args:
+            self.append(self.bindLocal(arg, arg))
+        self.lines.extend(code)
 
-        none = self.gensym()
-        type = self.gensym("$I")
-        res.append('    find_type %s, "PyNone"' % type)
-        res.append("    %s=new %s" % (none,type))
-        res.append("    .return (%s)" % none)
-        res.append(".end")
-        res.append("")
-        return "\n".join(res)
+        if self.reachable:
+            none = self.gensym()
+            type = self.gensym("$I")
+            self.append('find_type %s, "PyNone"' % type)
+            self.append("%s=new %s" % (none,type))
+            self.append(".return (%s)" % none)
+        self.append(".end", indent=False)
+        self.append("")
+        return "\n".join(self.lines)
 
     def getCodeForGenerator(self):
         
