@@ -4,6 +4,9 @@ Many thanks to:
  A.M. Kuchling ( http://www.amk.ca/ )
     for the original parrot-gen.py
 
+ Sam Ruby ( http://intertwingly.net/ )
+    for fixing concatenation and the + operator
+
  Terry Reedy
     laid out refactoring plan for self.expression()
 
