@@ -685,11 +685,32 @@ class PirateVisitor(object):
         self.append("throw %(ex)s" % locals())
 
     def visitAssert(self, node):
-        # another tree transformation:
+        # another tree transformation -- if not .test: raise .fail
         self.visit( ast.If(
             tests = [(ast.Not(node.test),
                       ast.Raise(node.fail, None, None))],
             else_ = None ))
+
+
+    def visitTryExcept(self, node):
+        assert len(node.handlers)==1, "only one handler for now" #@TODO
+        assert not node.else_, "try...else not implemented" #@TODO
+        catch = self.symbol("catch")
+        handler = self.symbol("handler")
+        endtry = self.symbol("endtry")
+        self.append(".local Sub %(handler)s" % locals())        
+        self.append("newsub %(handler)s, .Exception_Handler, %(catch)s" \
+                    % locals())
+        self.append("set_eh %(handler)s" % locals())
+        self.visit(node.body)
+        self.append("goto %(endtry)s" % locals())
+        self.append("%(catch)s:" % locals())
+        for hand in node.handlers:
+            expr, target, body = hand
+            assert not (expr or target), "can't get exception object yet" #@TODO
+            self.visit(body)
+        self.append("%(endtry)s:" % locals())
+                
         
 
 

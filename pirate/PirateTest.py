@@ -368,7 +368,18 @@ class PirateTest(unittest.TestCase):
             print 'do not enter'
             """, dump=0)
         self.assertEquals(res, "aw crap\n")
-            
+
+    def test_try_except(self):
+        res = self.run(
+            """
+            try:
+                print 'parrot',
+                raise hell
+                print 'dropped the ball'
+            except:
+                print 'caught it!'
+            """, dump=1)
+        self.assertEquals(res, "parrot caught it!\n")
 
 
 if __name__=="__main__":
