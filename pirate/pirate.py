@@ -21,11 +21,15 @@ class PirateVisitor:
 
     ##[ management stuff ]##########################################
     
-    def __init__(self):
+    def __init__(self, name, doc="", args=[]):
+        self.name = name
+        self.doc = doc
+        self.args = args
         self._last_lineno = None
         self.lines = []
         self.loops = []
         self.counter = {}
+        self.subs = []
 
     def symbol(self, prefix):
         """
@@ -34,6 +38,19 @@ class PirateVisitor:
         self.counter.setdefault(prefix,0)
         self.counter[prefix] += 1
         return "%s%05i" % (prefix, self.counter[prefix])
+
+    def getCode(self):
+        res  = ".sub %s\n" % self.name
+        if self.doc:
+            res += "    # %s\n" % self.doc
+        if self.args:
+            res += "    saveall\n"
+        for arg in self.args:
+            res += "    .param object %s\n" % arg
+        res += "\n".join(self.lines) + "\n"
+        res += ".end\n" 
+        res += "\n".join([s.getCode() for s in self.subs]) + "\n"
+        return res
     
 
     def set_lineno (self, node):
@@ -103,7 +120,11 @@ class PirateVisitor:
 
         ## function call
         elif klass==compiler.ast.CallFunc:
-            self.visitCallFunc(expr)
+            return self.callingExpression(expr, dest)
+
+        ## lambda:
+        elif klass==compiler.ast.Lambda:
+            return self.lambdaExpression(expr, dest)
 
         ## stuff to do... :)
         else:
@@ -206,6 +227,55 @@ class PirateVisitor:
         return res
 
 
+    def callingExpression(self, node, dest):
+        assert not (node.star_args or node.dstar_args), \
+               "f(*x,**y) not working yet"
+        assert node.node.__class__ != compiler.ast.Lambda, \
+               "can't call lambdas directly yet" # @TODO: fix this!
+        res = []
+        node.args.reverse()
+        for arg in node.args:
+            var = self.symbol("arg")
+            res.append(".local object %s" % var)
+            res.extend(self.expression(arg, var))
+            res.append(".arg %s" % var)
+
+        #@TODO: use parrot calling conventions (invoke)
+        #@TODO: __py__ should use "from __parrot__ import __py__print"
+        adr = self.symbol("$I")
+        sub = node.node.name
+        if sub.startswith("__py__"):
+            res.append("%s = addr %s" % (adr, node.node.name))
+        else:
+            res.append("%s = %s" % (adr, sub))
+        res.append('jsr %s' % adr)
+        if dest:
+            res.append(".result %s" % dest)
+        return res
+
+
+
+    def lambdaExpression(self, node, dest):
+        assert not node.kwargs or node.varargs, "only simple args for now"
+        self.extend(self.set_lineno(node))
+        #self.subs.append(self.expression(
+        #import pdb; pdb.set_trace()
+        
+        sub = self.symbol("_sub")
+        adr = self.symbol("$I")
+        vis = compiler.visitor.ASTVisitor()
+        pir = PirateVisitor(sub,
+                            doc="lambda [line %s]" % node.lineno,
+                            args=node.argnames)
+        vis.preorder(compiler.ast.Return(node.code), pir)
+
+        self.subs.append(pir)
+        return ["%s = addr %s" % (adr, sub),
+                "%s = new PerlInt" % dest,
+                "%s = %s" % (dest, adr)]
+
+
+
     ##[ visitor methods ]##########################################
         
     def visitPrint(self, node):
@@ -215,7 +285,7 @@ class PirateVisitor:
             dest = self.symbol("$P")
             self.extend(self.expression(n, dest))
             self.append('.arg %s' % dest)
-            self.append('call _pyprint')
+            self.append('call __py__print')
             self.append('print " "')
 
 
@@ -329,43 +399,56 @@ class PirateVisitor:
         
         self.loops.pop()
 
+
     def visitBreak(self, node):
         assert self.loops, "break outside of loop" # SyntaxError
+
         self.append("goto %s" % self.loops[-1][1])
+
 
     def visitContinue(self, node):
         assert self.loops, "continue outside of loop" # SyntaxError
         self.append("goto %s" % self.loops[-1][0])
 
-    def visitCallFunc(self, node):
-        assert not (node.star_args or node.dstar_args), "f(*x,**y) not working yet"
-        node.args.reverse()
-        for arg in node.args:
-            var = self.symbol("arg")
-            self.append(".local object %s" % var)
-            self.extend(self.expression(arg, var))
-            self.append(".arg %s" % var)
-        self.append('call %s' % node.node.name)
 
+    def visitCallFunc(self, node):
+        # visited when a function is called as a subroutine
+        # (not as part of a larger expression or assignment)
+        self.extend(self.callingExpression(node, dest=None))
+
+    def visitReturn(self, node):
+        _res= self.symbol("res")
+        self.append(".local object %s" % _res)
+        self.extend(self.expression(node.value, _res))
+        self.append(".return %s" % _res)
+        self.append("restoreall")
+        self.append("ret")
+        
         
 ## module interface ###############################################
 
 def compile(src):
     ast = compiler.parse(src)
     vis = compiler.visitor.ASTVisitor()
-    pir = PirateVisitor()
-    vis.preorder(ast, pir)
+    pir = PirateVisitor("__main__")
+    vis.preorder(ast, pir)    
     pir.append("end")
-    res = ".sub __main__\n" + ("\n".join(pir.lines)) + "\n.end\n"
-    return res 
+    return pir.getCode()
     
 
-def invoke(src, dump=0):
+def line_nos(seq):
+    return [(i+1, seq[i]) for i in range(len(seq))]
+
+def invoke(src, dump=0, lines=0):
     i,o = os.popen4("imcc -")
     code = compile(src)
     if dump:
         print
-        print code
+        if lines:
+            for no, line in line_nos(code.split("\n")):
+                print "% 4i: %s" % (no, line)
+        else:
+            print code
     print >> i, code
     print >> i, open("pirate.imc").read()
     i.close()    

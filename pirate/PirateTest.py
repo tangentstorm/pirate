@@ -13,9 +13,9 @@ def trim(s):
     # strip indendation:
     indent = len(lines[0]) - len(lines[0].lstrip())
     return "\n".join([line[indent:] for line in lines])
-    
-def run(src, dump=0):
-    return pirate.invoke(trim(src), dump)
+
+def run(src, dump=0, lines=1):    
+    return pirate.invoke(trim(src), dump, lines=0)
 
 class PirateTest(unittest.TestCase):
 
@@ -179,11 +179,31 @@ class PirateTest(unittest.TestCase):
     def test_function(self):
         res = run(
             """
-            _pyprint('function call!') # from pirate.imc!!
+            __py__print('function call!') # from pirate.imc!!
             """, dump=0)
         self.assertEquals(res, "function call!")
 
-
+        
+    def test_lambda(self):
+        res = run(
+            """
+            f = lambda x: x+1
+            print f(4), f(5)
+            """, dump=0, lines=0)
+        self.assertEquals(res, "5 6\n")
+        
+    def test_scope(self):
+        res = run(
+            """
+            x = 5
+            f = lambda: x+1
+            print f()
+            x = x + 1
+            print f()
+            """, dump=1)
+        self.assertEquals(res, "6 7\n")
+        
+        
 if __name__=="__main__":
     unittest.main()
     
