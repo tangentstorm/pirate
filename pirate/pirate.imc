@@ -1,0 +1,35 @@
+## pirate standard library
+
+.sub _pyprint
+    #
+    # python print routine (special case for lists)
+    # 
+    saveall
+    .param object s
+    typeof $S0, s
+    if $S0 == "PerlArray" goto _list
+        print s
+        goto _endif
+    _list:
+        .local int len
+        .local int i
+        .local object item
+
+        print "["
+        len = s
+        i = 0
+        _loop:
+            if i >= len goto _endloop
+            item = s[i]
+            .arg item
+            call _pyprint
+            i = i + 1
+            if i >= len goto _endloop
+            print ", "
+            goto _loop
+        _endloop:
+        print "]"
+    _endif:
+    restoreall
+    ret
+.end

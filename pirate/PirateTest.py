@@ -28,11 +28,12 @@ class PirateTest(unittest.TestCase):
             """))
         goal = trim(
             """
-            __main__:
+            .sub __main__
                 print "\\n"
                 end
+            .end
             """)
-        assert res == goal, "bad bytecode from compile():\n%s" % res
+        assert res.startswith(goal), "bad bytecode from compile():\n%s" % res
 
     
     def test_print(self):
@@ -110,6 +111,17 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "96 64\n32\n")
 
 
+    def test_list(self):
+        res = run(
+            """
+            print [], [1], [1,2,3]
+            """)
+        self.assertEquals(res, "[] [1] [1, 2, 3]\n")
+    
+    def test_for(self):
+        pass
+           
+                                                                    
 if __name__=="__main__":
     unittest.main()
     

@@ -15,7 +15,7 @@ class PirateVisitor:
     
     def __init__(self):
         self._last_lineno = None
-        self.lines = ["__main__:"]
+        self.lines = []
         self.counter = {}
 
     def symbol(self, prefix):
@@ -63,18 +63,35 @@ class PirateVisitor:
         """
         create code to eval expression Node 'expr' and put it in 'dest'
         """
+        ## plain old variables
         if isinstance(expr, compiler.ast.Name):
             return ["%s = %s" % (dest, expr.name)]
+
+        ## constants
         elif isinstance(expr, compiler.ast.Const):
             t = type(expr.value)
             assert t in self.typeMap, "unsupported const type:%s" % t
             return [("%s = new %s" % (dest, self.typeMap[t])),
                     ("%s = %s" % (dest, repr(expr.value)))]
+
+        ## lists
+        elif isinstance(expr, compiler.ast.List):
+            res = ["%s = new PerlArray" % dest]
+            sym = self.symbol("$P")
+            for item in expr.nodes:
+                res.extend(self.expression(item, sym))
+                res.append("push %s, %s" % (dest, sym))
+            return res
         
+        ## math expressions
         elif isinstance(expr, tuple(self.infixOps.keys())):
             return self.infixExpression(expr, dest)
+
+        ## comparisons
         elif isinstance(expr, compiler.ast.Compare):
             return self.compareExpression(expr, dest)
+
+        ## stuff to do... :)
         else:
             print
             print
@@ -158,7 +175,8 @@ class PirateVisitor:
             self.extend(self.set_lineno(n))
             dest = self.symbol("$P")
             self.extend(self.expression(n, dest))
-            self.append('print %s' % dest) # % repr(n.value))
+            self.append('.arg %s' % dest)
+            self.append('call _pyprint')
             self.append('print " "')
 
 
@@ -234,7 +252,8 @@ def compile(src):
     pir = PirateVisitor()
     vis.preorder(ast, pir)
     pir.append("end")
-    return ("\n".join(pir.lines)) + "\n"
+    res = ".sub __main__\n" + ("\n".join(pir.lines)) + "\n.end\n"
+    return res + ( open("pirate.imc").read() )
     
 
 def invoke(src, dump=0):
