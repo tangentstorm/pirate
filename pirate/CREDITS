@@ -33,6 +33,14 @@ Many thanks to:
     challenge, even if the terms say he can't use this
     code. :)
 
+ Allen Short  ( dash on #python )
+    For a massive patch covering variable binding 
+    and IMCC symbol declaration.
+
+ David Chan ( http://sheetmusic.org.uk/ )
+    For various bugfixes, augmented assignment,
+    and "else" clauses in loops.
+
  Ole Martin Bjorndalen ( http://www.cs.uit.no/~olemb/ )
     for readlisp.py
 
@@ -44,3 +52,4 @@ Many thanks to:
 
  Guido van Rossum
     for python of course! :)
+
