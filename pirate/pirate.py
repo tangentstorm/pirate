@@ -73,7 +73,13 @@ class PirateVisitor(object):
         res += "\n\n".join([s.getCode() for s in self.subs]) + "\n"
         return res
     
+    def imcObject(self, name):
+        symbol = self.symbol(name)
+        self.append(".local object %(symbol)s" % locals())
+        self.append("%(symbol)s = new PerlUndef" % locals())
+        return symbol
 
+    
     def set_lineno (self, node):
         if (node.lineno is not None and
             node.lineno != self._last_lineno):
@@ -126,18 +132,28 @@ class PirateVisitor(object):
             ast.Or:  self.logicExpression,
             ast.And: self.logicExpression,
             ast.Not: self.logicExpression,
+
+            ast.UnarySub:    self.expressUnary,
+            ast.UnaryAdd:    self.expressUnary,
+            ast.Invert:      self.expressUnary, 
             
             ast.Add: self.infixExpression,
             ast.Sub: self.infixExpression,
             ast.Mul: self.infixExpression,
             ast.Div: self.infixExpression,
             ast.Mod: self.infixExpression,
+            ast.LeftShift: self.infixExpression,
+            ast.RightShift: self.infixExpression,
+
+            ast.Bitor: self.expressBitwise,
+            ast.Bitxor: self.expressBitwise,            
+            ast.Bitand: self.expressBitwise,
 
             # leo's patch:
             #ast.Sub: self.binaryExpression,
         }
         try:
-            return handler[node.__class__](node, dest, allocate)
+            meth = handler[node.__class__]
         except KeyError:
             print "## unknown expression:"
             print node
@@ -145,6 +161,8 @@ class PirateVisitor(object):
             print
             import pdb; pdb.set_trace()
 
+        # still here, so...
+        return meth(node, dest, allocate)
 
     constMap = {
         str: "PerlString",
@@ -274,7 +292,44 @@ class PirateVisitor(object):
 	return dest
 
 
+    unaryOps = {
+        ast.UnaryAdd: " ", # do absolutely nothing at all!!
+        ast.UnarySub: "-",
+        ast.Invert:   "~",
+    }
 
+    def expressUnary(self, node, dest, allocate):
+        assert allocate==1
+        value = self.imcObject("value")
+        self.compileExpression(node.expr, value)
+        op = self.unaryOps[node.__class__]
+        self.append("%(dest)s = new PerlUndef" % locals())
+        self.append("%(dest)s = %(op)s%(value)s" % locals())
+        return dest
+
+
+    bitwiseOps = {
+        ast.Bitand: "&",
+        ast.Bitor: "|",
+        ast.Bitxor: "~", # weird but true
+    }
+    
+    def expressBitwise(self, node, dest, allocate):
+        assert allocate == 1
+        value = self.imcObject("value")
+        next = self.imcObject("next")
+        
+        op = self.bitwiseOps[node.__class__]
+        self.compileExpression(node.nodes[0], value)
+        for n in node.nodes[1:]:
+            self.compileExpression(n, next)
+            self.append("%(value)s = %(value)s %(op)s %(next)s" % locals())
+
+        
+        
+        #Bitand: "&",
+        self.append("%(dest)s = %(value)s" % locals())
+        return dest
 
     infixOps = {
         ast.Add: "+",
@@ -282,9 +337,8 @@ class PirateVisitor(object):
         ast.Mul: "*",
         ast.Div: "/",
         ast.Mod: "%",
-        #ast.Power: "**",        # doesn't work yet
-        #ast.RightShift: '>>',   # untested
-        #ast.LeftShift: '<<',    # untested
+        ast.RightShift: '>>',   # untested
+        ast.LeftShift: '<<',    # untested
     }
 
         

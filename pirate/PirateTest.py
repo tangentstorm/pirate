@@ -77,10 +77,10 @@ class PirateTest(unittest.TestCase):
         res = self.run(
             """
             x = (1 + 2) * 3 - 4
-            print x % 3
-            print 4/2  # note: this returns a float in parrot
+            print x % 3,
+            print 4/2  # @TODO: this returns a float in parrot
             """, dump=0)
-        self.assertEquals(res, "2\n2.000000\n")
+        self.assertEquals(res, "2 2.000000\n")
 
 
     def test_compare(self):
@@ -92,6 +92,7 @@ class PirateTest(unittest.TestCase):
             """)
         self.assertEquals(res, "1 0 1 1 0 1 ")
 
+
     def test_logic(self):
         res = self.run(
             """
@@ -102,6 +103,43 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "cat and mouse ")
 
 
+    def test_bitwise(self):
+        res = self.run(
+            """
+            print 1 & 3,     # == 1
+            print 1 & 2 & 3, # == 0
+            print 1 | 3,     # == 3
+            print 1 | 2 | 3, # == 3
+            print 1 ^ 3,     # == 2
+            print 1 ^ 2 ^ 3, # == 0
+            print (15 & 22) | (1 ^ 9)  # == 14
+            """, dump=0)
+        self.assertEquals(res, "1 0 3 3 2 0 14\n")
+
+
+    def test_shift(self):
+        res = self.run(
+            """
+            print 1 << 2,
+            print 1 << 2 << 2,
+            print 1 >> 2,
+            print 256 >> 2,
+            print 256 >> 2 >> 2,
+            """, dump=0)
+        self.assertEquals(res, "4 16 0 64 16 ")
+
+            
+    def test_unary(self):
+        res = self.run(
+            """
+            x = 1
+            print -x,
+            print +x,
+            print ~x,
+            print not x, 
+            """, dump=0, lines=1)
+        self.assertEquals(res, "-1 1 -2 0 ")
+        
 
     ## pass ######################################
         

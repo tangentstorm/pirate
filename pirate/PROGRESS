@@ -54,25 +54,23 @@ e visitName:
 e visitNot:
 e visitOr:
 e visitSub:
+e visitBitand:
+e visitBitor:
+e visitBitxor:
+e visitLeftShift:
+e visitRightShift:
+e visitUnaryAdd:
+e visitUnarySub:
+e visitInvert:
 
 
 ## not done yet #################################
 
 
 ## operators #############
-n visitBackquote:
-n visitBitand:
-n visitBitor:
-n visitBitxor:
-n visitPower:
-n visitLeftShift:
-n visitRightShift:
-n visitUnaryAdd:
-n visitUnaryInvert:
-n visitUnarySub:
 n visitFloorDiv:
-n visitInvert:
-
+n visitPower: not implemented in parrot for pmc's
+n visitBackquote: tree transform to str(x)
 
 ## keyword arguments #####
 n visitKeyword: keyword arguments (on calling side)
@@ -80,15 +78,16 @@ n visitKeyword: keyword arguments (on calling side)
 
 ## assignments ###########
 n del ( OP_DELETE in assign )
+
 n visitAugAssign:
 n visitAugName(self, node, mode):
 n visitAugSubscript(self, node, mode):
+n visitAugGetattr(self, node, mode):
 
 
 ## o-o stuff #############
 n visitClass:
 n visitAssAttr:
-n visitAugGetattr(self, node, mode):
 n visitGetattr:
 
 
