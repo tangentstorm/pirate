@@ -728,7 +728,7 @@ class PirateTest(unittest.TestCase):
                 def talk(self):
                     print 'hello!'
             Hello().talk()
-            """, dump=1)
+            """, dump=0)
         self.assertEquals(res, "hello!\n")
 
 
