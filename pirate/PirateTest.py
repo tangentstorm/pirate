@@ -275,7 +275,7 @@ class PirateTest(unittest.TestCase):
             """, dump=0, lines=0)
         self.assertEquals(res, "1 0 ")
 
-    def test_scope(self):
+    def test_lexical_scope(self):
         res = self.run(
             """
             x = 1
@@ -287,6 +287,27 @@ class PirateTest(unittest.TestCase):
             print h(5), x
             """, dump=0, lines=0)
         self.assertEquals(res, "15 1\n")
+
+    def test_no_return(self):
+        res = self.run(
+            """
+            def f(): pass
+            print f()
+            """, dump=0,lines=0)
+        self.assertEquals(res, "None\n")
+
+    def test_global(self):
+        res = self.run(
+            """
+            def change():
+                global x
+                x = 'dog'
+            x = 'cat'
+            change()
+            print x
+            """, dump=0)
+        self.assertEquals(res, "dog\n")
+            
 
 
 if __name__=="__main__":

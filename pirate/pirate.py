@@ -56,6 +56,7 @@ class PirateVisitor(object):
         self.subs = []
         self.vars = {}
         self.depth = depth or 0 # lexical scope depth
+        self.globals = {}
 
     def symbol(self, prefix):
         """
@@ -160,10 +161,10 @@ class PirateVisitor(object):
 
 
     def nameExpression(self, expr, dest):
-        if expr.name in self.vars:
-            self.append("find_lex %s, '%s'" % (dest, expr.name))
-        else:
-            self.append("%s = %s" % (dest, expr.name))
+        #if expr.name in self.vars:
+        self.append("find_lex %s, '%s'" % (dest, expr.name))
+        #else:
+        #    self.append("%s = %s" % (dest, expr.name))
 
 
     def listExpression(self, expr, dest):
@@ -465,7 +466,10 @@ class PirateVisitor(object):
             else:
                 self.append(".local object %s" % name)
                 self.compileExpression(expr, name)
-                self.append("store_lex -1, '%s', %s" % (name,name))
+                if name in self.globals:
+                    self.append("store_lex  0, '%s', %s" % (name,name))
+                else:
+                    self.append("store_lex -1, '%s', %s" % (name,name))
 
 
     def visitWhile(self, node):
@@ -512,9 +516,14 @@ class PirateVisitor(object):
         self.append("%s = 0" % loopidx)
 
         # get the next item (also where "continue" jumps to)
-        self.append("%s:" % _for)
+        self.append("%s:" % _for)        
         self.append("%s = %s[%s]" % (node.assign.name, forlist, loopidx))
-        self.append("%s = %s + 1" % (loopidx, loopidx))
+
+        value = self.symbol("$P")
+        name = node.assign.name
+        self.append("%(value)s = %(forlist)s[%(loopidx)s]" % locals())
+        self.append("store_lex -1, '%(name)s', %(value)s"  % locals())
+        self.append("%(loopidx)s = %(loopidx)s + 1" % locals())
         
         # do the loop body
         self.visit(node.body)
@@ -557,8 +566,6 @@ class PirateVisitor(object):
     def visitFunction(self, node):  # visitDef
         #self.append(".local object %s" % node.name) #@TODO: use set_lex
         self.genFunction(node, node.name, allocate=1)
-
-
                 
 
 
@@ -577,6 +584,8 @@ class PirateSubVisitor(PirateVisitor):
             self.vars[arg]=arg
         self.counter = counter
         self.depth = depth
+        self.globals = []
+        
     def getCode(self):
         res = ""
         if self.doc:
@@ -588,9 +597,21 @@ class PirateSubVisitor(PirateVisitor):
         for arg in self.args:
             res += "    store_lex -1, '%s', %s\n" % (arg,arg)
         res += "\n".join(self.lines) + "\n"
+        res += "    .local object None\n"
+        res += "    None = new PerlString\n"  #@TODO: .PythonNone
+        res += "    None = 'None'\n"
+        res += "    .pcc_begin_return\n"
+        res += "    .return None\n"
+        res += "    .pcc_end_return\n"
         res += ".end\n\n"
         res += "\n\n".join([s.getCode() for s in self.subs])
         return res
+    
+    def visitGlobal(self, node):
+        for var in node.names:
+            self.globals.append(var)
+
+
         
 ## module interface ###############################################
 
