@@ -33,10 +33,12 @@ class imclist(list):
     """
     
     def append(self, line):
+        is_setline = line.startswith("setline")
         if ':' not in line:
             line = "    %-30s"  %line
             if "#" not in line:
-                line = line + "# %s"  % self.find_linenumber()
+                if not is_setline: # work round IMCC parsing bug
+                    line = line + "# %s"  % self.find_linenumber()
         super(imclist, self).append(line)
         
     def find_linenumber(self):
@@ -102,7 +104,7 @@ class PirateVisitor(object):
         if (node.lineno is not None and
             node.lineno != self._last_lineno):
             self._last_lineno = node.lineno
-            #self.append('setline %i' % node.lineno)
+            self.append('setline %i' % node.lineno)
 
 
     def append(self, line):
@@ -252,12 +254,17 @@ class PirateVisitor(object):
             check = self.gensym("ck")
             self.append("%s = %s" % (check, slot))
             key = getattr(node.subs[0], "value", node.subs[0])
-            self.assertNotUndefined(check, "KeyError: " + key)
+            self.assertNotUndefined(check, "KeyError: " + str(key))
 
         if node.flags == "OP_DELETE":
             self.append("delete " + slot)
-        else:
+        elif node.flags=="OP_ASSIGN":
             return slot
+        else:
+            # imcc doesn't grok d[a][b] so set temp=d[a] and do temp[b]
+            temp = self.gensym("temp")
+            self.append("%s=%s" % (temp, slot))
+            return temp
 
 
     def expressGetattr(self, node, allocate):
@@ -430,7 +437,7 @@ class PirateVisitor(object):
 
 
     def genFunction(self, node,  name, allocate=1):
-        assert not node.kwargs or node.varargs, \
+        assert not node.kwargs and not node.varargs, \
                "@TODO: only simple args for now"
         self.set_lineno(node)
 
@@ -640,6 +647,31 @@ class PirateVisitor(object):
             ## @TODO: unpack wrong size check should also be at runtime
             raise ValueError("unpack sequence of wrong size")
 
+    ##[ augmented assign ]#########################################
+
+    def visitAugAssign(self, aug):
+        """tranforms tree to a standard assignment and calls visitAssign
+        
+        @TODO: when Python Objects are available, this should try calling
+        __iadd__ etc first.  It should only do a standard assignment if the
+        object has no __iXXX__ method.
+        """
+        if isinstance(aug.node, ast.Name):  # e.g. x += 2
+            lhs = ast.AssName(aug.node.name, 'OP_ASSIGN')
+        elif isinstance(aug.node, ast.Getattr):   # e.g. (x+a).p += 2
+            lhs = ast.AssAttr(aug.node.expr, aug.node.attrname, 'OP_ASSIGN')
+        elif isinstance(aug.node, ast.Subscript):   # e.g. (x+a)[0] += 2
+            lhs = ast.Subscript(aug.node.expr, 'OP_ASSIGN', aug.node.subs)
+
+        ops = {'**=':'Power', '*=':'Mul', '/=':'Div', '%=':'Mod', '+=':'Add',
+               '-=':'Sub', '<<=':'LeftShift', '>>=':'RightShift',
+               '|=':'Bitor', '^=':'Bitxor', '&=':'Bitand'}
+        op_node_class = getattr(ast, ops[aug.op])
+        rhs = op_node_class((aug.node, aug.expr))
+        new_node = ast.Assign([lhs], rhs)
+
+        self.visitAssign(new_node)
+
     ##[ del ]######################################################
 
     def visitAssName(self, node):
@@ -673,30 +705,33 @@ class PirateVisitor(object):
 
     ##[ control stuctures ]#########################################
 
-    def visitWhile(self, node):
-        assert node.else_ is None, "@TODO: while...else not supported"
+    def visitWhile(self, node):        
         self.set_lineno(node)
         _while = self.genlabel("while")
+        _elsewhile = self.genlabel("elsewhile") # sync nums even if no "else"
         _endwhile = self.genlabel("endwhile")
         self.loops.append((_while, _endwhile))
         
         self.append(_while+ ":")
         testvar = self.compileExpression(node.test)
-        self.append("unless %s goto %s" % (testvar, _endwhile))
+        self.append("unless %s goto %s" % (testvar, _elsewhile))
         self.visit(node.body)
         self.append("goto " + _while)
+        self.append(_elsewhile + ":")
+        if node.else_:
+            self.visit(node.else_)
         self.append(_endwhile + ":")
         self.loops.pop()
 
 
     def visitFor(self, node):
-        assert node.else_ is None, "@TODO: for...else not supported"
         assert not isinstance(node.assign, ast.AssTuple), \
                "@TODO: for x,y not implemented yet"
         self.set_lineno(node)
         name = self.gensym("for_%s_" % node.assign.name)
         _for = self.genlabel("for")
         _endfor = self.genlabel("endfor")
+        _elsefor = self.genlabel("elsefor")
         self.loops.append((_for, _endfor))
 
         loopidx = self.gensym("idx", 'int')
@@ -711,9 +746,8 @@ class PirateVisitor(object):
 
         # get the next item (also where "continue" jumps to)
         self.append(_for + ":")
-        self.append("save " + forlist)
-        self.append("%s = %s[%s]" % (name, forlist, loopidx))
-
+        self.append("if %(loopidx)s >= %(listlen)s goto %(_elsefor)s" % locals())
+        
         value = self.gensym("forval")
         self.append("%s = %s[%s]" % (value, forlist, loopidx))
         self.append(self.bindLocal(node.assign.name, value))
@@ -722,13 +756,19 @@ class PirateVisitor(object):
         # do the loop body
         self.visit(node.body)
 
-        self.append("restore %(forlist)s" % locals())
+        # loop
+        self.append("goto " + _for)
 
-        # now loop!
-        self.append("if %s < %s goto %s" % (loopidx, listlen, _for))
+        # else: this is where we go if the loop ends with no "break"
+        self.loops.pop() # no longer part of the loop
+        self.append("%(_elsefor)s:" % locals())
+        if node.else_:
+            self.visit(node.else_)
+            
+        # end
         self.append(_endfor + ":")
         
-        self.loops.pop()
+
 
 
     def visitBreak(self, node):
