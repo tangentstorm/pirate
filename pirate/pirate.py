@@ -546,25 +546,56 @@ class PirateVisitor(object):
         return dest
 
     def callingExpression(self, node, allocate):
-        assert not (node.star_args or node.dstar_args), \
-               "@TODO: f(*x,**y) not working yet"
-        
-        args = [self.compileExpression(arg, allocate=1) for arg in node.args]
-        args=",".join(args)
-
-        dest = self.gensym()
+        # gather up arguments
+        args = []
+        keywords = {}
+        for arg in node.args:
+            if isinstance(arg, ast.Keyword):
+                keywords[arg.name] = self.compileExpression(arg.expr)
+            else:
+                args.append(self.compileExpression(arg, allocate=1))
 
         # figure out what we're calling
         if isinstance(node.node, ast.Lambda):
-            # lambdas don't have names!
-            sub_pmc = self.lambdaExpression(node.node, allocate=0)
-            self.append("%s = %s(%s)" % (dest,sub_pmc,args))
+            sub = self.lambdaExpression(node.node, allocate=0)
         elif isinstance(node.node, ast.Getattr):
             obj = self.compileExpression(node.node.expr)
-            self.append("%s=%s.%s(%s)" % (dest,obj,node.node.attrname,args))
+            sub = "%s.%s" % (obj,node.node.attrname)
         else:
-            func = self.compileExpression(node.node, allocate=1)
-            self.append("%s=%s(%s)" % (dest,func,args))
+            sub = self.compileExpression(node.node, allocate=1)
+
+        if node.star_args or node.dstar_args or keywords:
+            if node.star_args and not args:
+                argx = self.compileExpression(node.star_args)
+            else:
+                argx = self.gensym()
+                self.append("new %s, %s" % (argx,self.find_type("PyList")))
+
+                for arg in args:
+                    self.append("push %s, %s" % (argx, arg))
+
+                if node.star_args:
+                    sargs = self.compileExpression(node.star_args)
+                    self.append("%s = %s + %s" % (argx, argx, sargs))
+
+            if node.dstar_args and not keywords:
+                keyx = self.compileExpression(node.dstar_args)
+            else:
+                keyx = self.gensym()
+                self.append("new %s, %s" % (keyx,self.find_type("PyDict")))
+
+                if node.dstar_args:
+                    dsargs = self.compileExpression(node.star_args)
+                    self.append("%s.update(%s)" % (keyx, dsargs))
+
+                for (name,value) in keywords.items():
+                    self.append("%s['%s']=%s" % (keyx, name, value))
+
+            sub = sub + ".__call__"
+            args = [argx,keyx]
+
+        dest = self.gensym()
+        self.append("%s=%s(%s)" % (dest,sub,",".join(args)))
 
         self.locals = {}
         return dest
@@ -610,6 +641,8 @@ class PirateVisitor(object):
 
         # store the address in dest
         self.append("newsub %s, %s, %s" % (ref, self.find_type("PyFunc"), sub))
+        for (i, arg) in enumerate(node.argnames):
+            self.append("%s[%s] = '%s'" % (ref, i, arg))
         if allocate>0:
             self.append(self.bindLocal(node.name, ref))
             self.vars[ref] = ref
