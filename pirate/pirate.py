@@ -594,7 +594,6 @@ class PirateVisitor(object):
             sub = self.lambdaExpression(node.node, allocate=0)
         elif isinstance(node.node, ast.Getattr):
             obj = self.compileExpression(node.node.expr, allocate=1)
-            args.insert(0, obj)
             sub = "%s.%s" % (obj,node.node.attrname)
         else:
             sub = self.compileExpression(node.node, allocate=1)
@@ -632,7 +631,7 @@ class PirateVisitor(object):
                 self.append("getattribute %s, %s, '%s'" % args)
                 sub = tmp
 
-            args = [sub,argx,keyx]
+            args = [argx,keyx]
             sub = sub + ".__call__"
 
         if allocate>-2:
