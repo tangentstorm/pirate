@@ -312,7 +312,7 @@ class PirateVisitor(object):
     
 
     def compareExpression(self, expr, dest, allocate):
-        assert len(expr.ops) == 1, "multi-compare not working yet"
+        assert len(expr.ops) == 1, "@TODO: multi-compare not working yet"
 
         # get left side:
         symL = self.symbol("$P")
@@ -361,7 +361,7 @@ class PirateVisitor(object):
 
     def callingExpression(self, node, dest, allocate):
         assert not (node.star_args or node.dstar_args), \
-               "f(*x,**y) not working yet"
+               "@TODO: f(*x,**y) not working yet"
         
         args = []
         node.args.reverse()
@@ -400,7 +400,8 @@ class PirateVisitor(object):
 
 
     def genFunction(self, node, dest, allocate=1):
-        assert not node.kwargs or node.varargs, "only simple args for now"
+        assert not node.kwargs or node.varargs, \
+               "@TODO: only simple args for now"
         self.set_lineno(node)
 
         # functions are always anonymous, so make fake names
@@ -496,7 +497,7 @@ class PirateVisitor(object):
     ##[ visitor methods ]##########################################
 
     def visitPrint(self, node):
-        assert node.dest is None, "print >> not yet handled"
+        assert node.dest is None, "@TODO: print >> not yet handled"
         for n in node.nodes:
             self.set_lineno(n)
             dest = self.symbol("$P")
@@ -628,7 +629,7 @@ class PirateVisitor(object):
     ##[ control stuctures ]#########################################
 
     def visitWhile(self, node):
-        assert node.else_ is None, "while...else not supported"
+        assert node.else_ is None, "@TODO: while...else not supported"
         self.set_lineno(node)
         _while = self.symbol("while")
         _endwhile = self.symbol("endwhile")
@@ -646,9 +647,9 @@ class PirateVisitor(object):
 
 
     def visitFor(self, node):
-        assert node.else_ is None, "for...else not supported"
+        assert node.else_ is None, "@TODO: for...else not supported"
         assert not isinstance(node.assign, ast.AssTuple), \
-               "for x,y not implemented yet"
+               "@TODO: for x,y not implemented yet"
 
         self.set_lineno(node)
         self.append(".local object %s" % node.assign.name)
@@ -744,8 +745,8 @@ class PirateVisitor(object):
 
     def visitTryExcept(self, node):
         self.set_lineno(node)
-        assert len(node.handlers)==1, "only one handler for now" #@TODO
-        assert not node.else_, "try...else not implemented" #@TODO
+        assert len(node.handlers)==1, "@TODO: only one handler for now"
+        assert not node.else_, "@TODO: try...else not implemented"
         catch = self.symbol("catch")
         handler = self.symbol("handler")
         endtry = self.symbol("endtry")
@@ -754,12 +755,13 @@ class PirateVisitor(object):
                     % locals())
         self.append("set_eh %(handler)s" % locals())
         self.visit(node.body)
-        self.append("clear_eh") #@TODO: this, but it triggers a coredump :)
+        self.append("clear_eh")
         self.append("goto %(endtry)s" % locals())
         self.append("%(catch)s:" % locals())
         for hand in node.handlers:
             expr, target, body = hand
-            assert not (expr or target), "can't get exception object yet" #@TODO
+            assert not (expr or target), \
+                   "@TODO: can't get exception object yet"
             self.visit(body)
         self.append("%(endtry)s:" % locals())
 
@@ -774,7 +776,7 @@ class PirateVisitor(object):
                     % locals())
         self.append("set_eh %(handler)s" % locals())
         self.visit(node.body)
-        self.append("clear_eh") #@TODO
+        self.append("clear_eh")
         self.append("%(final)s:" % locals())
         self.visit(node.final) 
 
