@@ -1041,7 +1041,6 @@ HEAD=\
 FOOT=\
 '''
 .include "pirate.imc"
-.include "__builtin__.imc"
 '''
 
 def compile(src, name="__main__"):
@@ -1053,9 +1052,7 @@ def compile(src, name="__main__"):
     if name=="__main__":
         lines = ['    loadlib P1, "python_group"',
                  '    find_global P0, "PyBuiltin", "__load__"',
-                 '    invoke',
-                 "    newsub P1, .Sub, __builtin___range0",
-                 "    store_lex 0, 'range', P1"]
+                 '    invoke']
         pir.lines = lines + pir.lines
     code =  pir.getCode()
     return code
