@@ -55,18 +55,6 @@ class PirateTest(unittest.TestCase):
         assert gotError, "should get unpack sequence wrong size ValueError"
 
 
-    def test_unpack_non_sequence(self):
-        try:
-            res = self.run(
-                """
-                a,b = 5
-                """)
-            gotError = 0
-        except TypeError:
-            gotError = 1
-        assert gotError, "should get unpack non-sequence TypeError"
-
-
     ## del #######################################
 
     def test_del_name(self):

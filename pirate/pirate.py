@@ -75,6 +75,7 @@ class PirateVisitor(object):
         self.locals = {}
         self.seen_labels = []
         self.pending_unless = None
+        self.exception = None
 
     def gensym(self, prefix="$P", type="object"):
         """
@@ -448,7 +449,7 @@ class PirateVisitor(object):
             op, code = test.ops[0]
             if op=="<>": op="!="
         
-            if op not in ("in","is","is not"):
+            if op not in ("in","not in","is","is not"):
                 symL = self.compileExpression(test.expr, allocate=1)
                 symR = self.compileExpression(code)
                 self.unless("%s %s %s" % (symL, op, symR), label)
@@ -483,10 +484,12 @@ class PirateVisitor(object):
             self.append("%s %s, %s, %s" % (self.compOps[op], temp, symL, symR))
             self.append("%s = %s" % (dest, temp))
         else:
-            assert op=="in"
+            assert op in ["in","not in"]
             temp = self.gensym("$I")
             self.append("exists %s, %s[%s]" % (temp, symR, symL))
             self.append("%s = %s" % (dest, temp))
+            if op == "not in":
+                self.append("not %s, %s" % (dest, dest))
 
         return dest
 
@@ -598,6 +601,12 @@ class PirateVisitor(object):
 
                 for (name,value) in keywords.items():
                     self.append("%s['%s']=%s" % (keyx, name, value))
+
+            if sub.find('.')>=0:
+                tmp = self.gensym()
+                args = tuple([tmp]+sub.split('.'))
+                self.append("getattribute %s, %s, '%s'" % args)
+                sub = tmp
 
             sub = sub + ".__call__"
             args = [argx,keyx]
@@ -737,15 +746,22 @@ class PirateVisitor(object):
     ##[ visitor methods ]##########################################
 
     def visitPrint(self, node):
-        assert node.dest is None, "@TODO: print >> not yet handled"
+        dest = None
+        if node.dest: dest = self.compileExpression(node.dest)
         for n in node.nodes:
             arg = self.compileExpression(n)
-            self.append("print_item %s" % arg)
+            if dest:
+                self.append("print_item %s,%s" % (dest,arg))
+            else:
+                self.append("print_item %s" % arg)
             
 
     def visitPrintnl(self, node):
         self.visitPrint(node)
-        self.append('print_newline')
+        if node.dest:
+            self.append('print_newline %s', self.compileExpression(node.dest))
+        else:
+            self.append('print_newline')
 
 
     def visitIf(self, node):
@@ -824,37 +840,38 @@ class PirateVisitor(object):
             # the children if present, or just the node in a list
             return getattr(side,"nodes",[side])
 
-        rside = listify(node.expr)
+        lsides = []
+        for names in node.nodes:
+            lsides.insert(0, listify(names))
 
-        for lside in node.nodes: 
-            lside = listify(lside)
+        rside = []
+        expr = listify(node.expr)
+        if len(expr)==0 or min(map(len,lsides))==1:
+            # eg, x = []
+            rside.append(self.compileExpression(node.expr, allocate=1))
+        else:
+            for value in expr:
+                rside.append(self.compileExpression(value, allocate=1))
 
-            if len(rside)==0 or len(lside)==1:
+        for lside in lsides:
+
+            if len(lside)==1:
                 # eg, x = []
-                self.assign(lside[0],
-                            self.compileExpression(node.expr, allocate=1))
+                self.assign(lside[0], rside[0]);
 
             elif (len(lside) == len(rside)):
                 ## this works for l=r AND l=r,r,r,r
                 ## because of AssTuple nodes :)
-                temp = []
-                for expr in rside:
-                    temp.append(self.compileExpression(expr, allocate=1))
                 for i, node in enumerate(lside):
-                    self.assign(node, temp[i])
+                    self.assign(node, rside[i])
     
             elif len(rside)==1:
                 ## this handles l,l,l=r and l,l,l=r()
-                rside = rside[0]
-                if isinstance(rside, ast.Const):
-                    ## @TODO: non-sequence check should be at *runtime*
-                    raise TypeError("unpack non-sequence")
-                else:
-                    value = self.compileExpression(rside)
-                    for (i, node) in enumerate(lside):
-                        extract = self.gensym()
-                        self.append("%s = %s[%s]" % (extract, value, i))
-                        self.assign(node, extract)
+                ## @TODO: compare len(lside) against rside.elements()
+                for (i, node) in enumerate(lside):
+                    extract = self.gensym()
+                    self.append("%s = %s[%s]" % (extract, rside[0], i))
+                    self.assign(node, extract)
             else:
                 ## i don't THINK there are any other combinations... (??)
                 ## @TODO: unpack wrong size check should also be at runtime
@@ -1042,8 +1059,11 @@ class PirateVisitor(object):
     ##[ exceptions ]####################################################
 
     def visitRaise(self, node):
-        assert node.expr1, "argument required for raise"
-        assert not (node.expr3), "only 3 arg raises not supported"
+        if not node.expr1:
+            self.append("rethrow %s" % self.exception)
+            return
+
+        assert not (node.expr3), "3 arg raises not supported"
         self.set_lineno(node)
 
         exceptsym = self.gensym()
@@ -1073,21 +1093,22 @@ class PirateVisitor(object):
     def visitTryExcept(self, node):
         self.set_lineno(node)
         assert len(node.handlers)==1, "@TODO: only one handler for now"
-        assert not node.else_, "@TODO: try...else not implemented"
+        # assert not node.else_, "@TODO: try...else not implemented"
         catch = self.genlabel("catch")
         endtry = self.genlabel("endtry")
         self.append("push_eh " + catch)
         self.visit(node.body)
+        if node.else_: self.visit(node.else_)
         self.append("clear_eh")
         self.goto(endtry)
         self.label(catch)
         for hand in node.handlers:
             expr, target, body = hand
+            self.exception = self.gensym()
+            self.append("%s = P5" % self.exception)
             if expr:
                 expr = self.compileExpression(expr)
-                tmp = self.gensym()
-                self.append("%s = P5" % tmp)
-                expr = "%s.__match__(%s, %s)" % (expr, expr, tmp)
+                expr = "%s.__match__(%s, %s)" % (expr, expr, self.exception)
                 if target:
                     tmp = self.gensym()
                     self.append("%s = %s" % (tmp,expr))
@@ -1095,6 +1116,7 @@ class PirateVisitor(object):
                 else:
                     self.append(expr)
             self.visit(body)
+            self.exception = None
         self.label(endtry, optional=True)
 
                 
