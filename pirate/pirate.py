@@ -150,6 +150,10 @@ class PirateVisitor(object):
         instead, we need to to specify a destination 
         for each expression, and so we have to do our
         own dispatching outside the normal visitor walk.
+
+        allocate==0  => don't allocate if constant
+        allocate==1  => always allocate a var
+        allocate==-1 => allocate a var if string 
         """
 
         # in a sub, statements seem to get wrapped in
@@ -227,7 +231,7 @@ class PirateVisitor(object):
             r = r.replace('"','\\"')
             r = '"' + r[1:-1] + '"'
             r = r.replace("\\'","'")
-        if allocate:
+        if allocate>0 or (allocate==-1 and r.startswith('"')):
             dest = self.gensym()
             self.append("new %s, %s" % (dest,self.find_type(self.constMap[t])))
             self.append("%s = %s" % (dest, r))
@@ -253,28 +257,23 @@ class PirateVisitor(object):
 
 
     def expressSubscript(self, node, allocate):
-        assert len(node.subs) == 1, "huh? multiple subscripts?" # huh?
-        
-        d = self.compileExpression(node.expr, allocate=0)
-        subs = self.gensym('subs')
-        self.append(subs + " = new Key")
-        assert len(node.subs) == 1
-        realsubs = self.compileExpression(node.subs[0], allocate=0)
-        self.append("%s = %s" % (subs, realsubs))
-        
-        slot = "%s[%s]" % (d, subs)
+        base = self.compileExpression(node.expr, allocate=-1)
 
-        if node.flags != "OP_ASSIGN":
-            check = self.gensym()
-            self.append("%s = %s" % (check, slot))
-            key = getattr(node.subs[0], "value", node.subs[0])
+        for sub in node.subs[:-1]:
+            temp = self.gensym()
+            sub = self.compileExpression(sub, allocate=-1)
+            self.append("%s = %s[%s]" % (temp, base, sub))
+            base = temp
+
+        sub = self.compileExpression(node.subs[-1], allocate=-1)
+        
+        slot = "%s[%s]" % (base, sub)
 
         if node.flags == "OP_DELETE":
             self.append("delete " + slot)
         elif node.flags=="OP_ASSIGN":
             return slot
         else:
-            # imcc doesn't grok d[a][b] so set temp=d[a] and do temp[b]
             temp = self.gensym()
             self.append("%s=%s" % (temp, slot))
             return temp
@@ -370,9 +369,7 @@ class PirateVisitor(object):
         dest = self.gensym()
         self.append("new %s, %s" % (dest,self.find_type("PyObject")))
         lside = self.compileExpression(node.left, allocate=1)
-        rside = self.compileExpression(node.right)
-        if rside.startswith('"'):
-            rside = self.compileExpression(node.right, allocate=1)
+        rside = self.compileExpression(node.right, allocate=-1)
         
         op = self.infixOps[node.__class__]
         if op == "**":
@@ -398,19 +395,27 @@ class PirateVisitor(object):
         # get the op:
         op, code = expr.ops[0]
         if op=="<>": op="!="
+        if op=="is": op="=="
         
         # get right side:
         symR = self.compileExpression(code, allocate=1)
 
-        _cmp = self.genlabel("cmp")
-        _end = self.genlabel("endcmp")
         self.append("new %s, %s" % (dest,self.find_type("PyBoolean")))
-        self.append("if %s %s %s goto %s" % (symL, op, symR, _cmp))
-        self.append("%s = 0" % dest)
-        self.append("goto %s" % _end)
-        self.label(_cmp)
-        self.append("%s = 1" % dest)
-        self.label(_end)
+
+        if op=="in":
+            temp = self.gensym("$I")
+            self.append("exists %s, %s[%s]" % (temp, symR, symL))
+            self.append("%s = %s" % (dest, temp))
+        else:
+            _cmp = self.genlabel("cmp")
+            _end = self.genlabel("endcmp")
+            self.append("if %s %s %s goto %s" % (symL, op, symR, _cmp))
+            self.append("%s = 0" % dest)
+            self.append("goto %s" % _end)
+            self.label(_cmp)
+            self.append("%s = 1" % dest)
+            self.label(_end)
+
         return dest
 
     logicOps = {
@@ -501,7 +506,7 @@ class PirateVisitor(object):
 
         # store the address in dest
         self.append("newsub %s, %s, %s" % (ref, self.find_type("PyFunc"), sub))
-        if allocate:
+        if allocate>0:
             self.append(self.bindLocal(node.name, ref))
             self.vars[ref] = ref
         return ref
