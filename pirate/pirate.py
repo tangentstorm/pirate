@@ -636,6 +636,13 @@ class PirateVisitor(object):
         self.compileExpression(expr, value)
         return value
 
+    def visitAssName(self, node):
+        """
+        As far as I can tell, this node is only used for 'del name'
+        """
+        assert node.flags == "OP_DELETE", "expected AssName to be a del!"
+        raise NotImplementedError("@TODO: waiting on parrot to get del_lex")
+
 
     def visitAssign(self, node):
 

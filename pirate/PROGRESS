@@ -77,7 +77,7 @@ n visitKeyword: keyword arguments (on calling side)
 
 
 ## assignments ###########
-n del ( OP_DELETE in assign )
+n del ( OP_DELETE in assign ) (not possible yet in parrot)
 
 n visitAugAssign:
 n visitAugName(self, node, mode):

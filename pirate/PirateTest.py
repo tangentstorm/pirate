@@ -139,7 +139,18 @@ class PirateTest(unittest.TestCase):
             print not x, 
             """, dump=0, lines=1)
         self.assertEquals(res, "-1 1 -2 0 ")
-        
+
+## @TODO: no support for del_lex in parrot yet
+##
+##     def test_del(self):
+##         res = self.run(
+##             """
+##             x = 1
+##             del x
+##             print x
+##             """)
+##         self.assertEquals(res, "Lexical 'x' not found\n")
+
 
     ## pass ######################################
         
