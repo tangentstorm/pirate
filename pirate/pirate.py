@@ -94,6 +94,7 @@ class PirateVisitor(object):
         res += "    new_pad 0\n"
         res += "    newsub P0, .Exception_Handler, __py__catch\n"
         res += "    set_eh P0\n"
+        res += "    newclass P0, \"PythonIterator\" \n"
         res += "\n".join(self.lines) + "\n"
         res += ".end\n"
         res += ".include 'pirate.imc'\n\n"
@@ -747,6 +748,15 @@ class PirateVisitor(object):
         # get the next item (also where "continue" jumps to)
         self.append(_for + ":")
         self.append("if %(loopidx)s >= %(listlen)s goto %(_elsefor)s" % locals())
+
+        # Okay: somewhere in our list we might call a generator.
+        # Right now generators use parrot Coroutines. Coroutines
+        # don't preserve the register stack. Without this save op,
+        # the list we're looping through tends to get replaced
+        # with the Coroutine. Other variables are probably also
+        # being screwed up, but a "saveall" here would make an
+        # infinite loop, so....
+        self.append("save " + forlist)
         
         value = self.gensym("forval")
         self.append("%s = %s[%s]" % (value, forlist, loopidx))
@@ -755,6 +765,9 @@ class PirateVisitor(object):
         
         # do the loop body
         self.visit(node.body)
+
+        # restore the list (see save note, above)
+        self.append("restore " + forlist)
 
         # loop
         self.append("goto " + _for)
@@ -945,9 +958,13 @@ class PirateSubVisitor(PirateVisitor):
         res.append(".pcc_sub %s non_prototyped" % name)
         res.append("   .local object gen_fun")
         res.append("   .local object gen_obj")
+        res.append("   .local int iterator_type")
+
         res.append("   newsub gen_fun, .Coroutine, %s_g" % name)
-        res.append("   gen_obj = new ParrotObject")
+        res.append('   find_type iterator_type, "PythonIterator"')
+        res.append("   new gen_obj, iterator_type")
         res.append("   setprop gen_obj, 'next', gen_fun")
+
         res.append("   .pcc_begin_return")
         res.append("   .return gen_obj")
         res.append("   .pcc_end_return")
@@ -981,15 +998,11 @@ class PirateSubVisitor(PirateVisitor):
         self.append(".pcc_end_return")
 
     def visitYield(self, node):
-        # @TODO: any way to consolidate this with return?
         self.isGenerator = 1
         result = self.compileExpression(node.value, allocate=1)
-        #self.append("saveall")
-        #self.append("pop_pad")
         self.append(".pcc_begin_yield")
         self.append(".return " + result)
         self.append(".pcc_end_yield")
-        #self.append("restoreall")
         
         
                 
