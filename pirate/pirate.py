@@ -1123,7 +1123,9 @@ if __name__=="__main__":
 	    src = open(sys.argv[-1]).read()
         # dump or run?
         if "-d" in sys.argv:
+            print HEAD
             print compile(src)
+            print FOOT
         else:
             sys.stdout.write(invoke(src))
     else:
