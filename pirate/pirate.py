@@ -16,6 +16,16 @@ class PirateVisitor:
     def __init__(self):
         self._last_lineno = None
         self.lines = ["__main__:"]
+        self.counter = {}
+
+    def symbol(self, prefix):
+        """
+        Return a unique symbol for label names in generated code
+        """
+        self.counter.setdefault(prefix,0)
+        self.counter[prefix] += 1
+        return "%s%04x" % (prefix, self.counter[prefix])
+    
 
     def set_lineno (self, node):
         if (node.lineno is not None and
@@ -52,14 +62,25 @@ class PirateVisitor:
 
     def visitIf(self, node):
         assert len(node.tests) == 1, "Only one test supported"
+        _else = self.symbol("_else")
+        _endif = self.symbol("_endif")
         testExpr, body = node.tests[0]
         self.extend(self.set_lineno(testExpr))
-        self.append("unless %s goto _else" % testExpr.value)
+        
+        # if not true, goto _else
+        self.append("unless %s goto %s" % (testExpr.value, _else))
+
+        # do it ; goto _endif
         self.visit(body)
-        self.append("goto _endif")
-        self.append("_else:")
-        self.visit(node.else_)
-        self.append("_endif:")
+        self.append("goto %s" % _endif)
+        
+        # _else:
+        self.append("%s:" % _else)
+        if node.else_:
+            self.visit(node.else_)
+            
+        # _endif:
+        self.append("%s:" % _endif)
 
 ## module interface ###############################################
 
