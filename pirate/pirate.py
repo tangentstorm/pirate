@@ -285,13 +285,15 @@ class PirateVisitor:
         self.append(".local int %s" % loopidx)        
         self.append("%s = 0" % loopidx)
 
-        # do the loop body
+        # get the next item (also where "continue" jumps to)
         self.append("%s:" % _for)
         self.append("%s = %s[%s]" % (node.assign.name, forlist, loopidx))
+        self.append("%s = %s + 1" % (loopidx, loopidx))
+        
+        # do the loop body
         self.visit(node.body)
 
-        # then increment the index and loop
-        self.append("%s = %s + 1" % (loopidx, loopidx))
+        # now loop!
         self.append("if %s < %s goto %s" % (loopidx, listlen, _for))
         self.append("%s:" % _endfor)
         
@@ -300,6 +302,10 @@ class PirateVisitor:
     def visitBreak(self, node):
         assert self.loops, "break outside of loop" # SyntaxError
         self.append("goto %s" % self.loops[-1][1])
+
+    def visitContinue(self, node):
+        assert self.loops, "continue outside of loop" # SyntaxError
+        self.append("goto %s" % self.loops[-1][0])
 
 
         

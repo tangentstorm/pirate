@@ -50,12 +50,10 @@ class PirateTest(unittest.TestCase):
             """
             if 1:
                 print 'shiver me timbers!'
-                
             if 0:
                 print 'ahoy maties!'
             else:
                 print 'yar har har!'
-
             if 0:
                 print 'walk the plank!'
             elif 1:
@@ -151,7 +149,21 @@ class PirateTest(unittest.TestCase):
                 if num == 2: break
             """)
         self.assertEquals(res, "1 2 1 2 ")
+
+    def test_continue(self):
+        res = run(
+            """
+            for num in [1, 2, 3, 4, 5]:
+                if num < 4: continue
+                print num,
             
+            num = 0
+            while num<5:
+                num = num + 1
+                if num < 4: continue
+                print num,
+            """, dump=0)
+        self.assertEquals(res, "4 5 4 5 ")
            
                                                                     
 if __name__=="__main__":
