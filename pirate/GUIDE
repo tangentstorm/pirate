@@ -6,6 +6,22 @@
 	       even if you don't know python
 
 
+############
+
+INSTALLATION
+
+############
+
+   Install parrot and python.
+
+   As of Jan 10, 2004, you'll need a patched version of
+   parrot. The patch is Luke Palmer's code to make parrot
+   continuations close over register stacks. This patch may 
+   be part of the main parrot source tree by the time you
+   read this, but if not, there's a copy in LUKEPATCH.
+
+   Once you've got a decent parrot, run the tests:
+
 
 #################
 
@@ -13,18 +29,17 @@ RUNNING THE TESTS
 
 #################
 
-   The first thing to do is run the tests. If everything
-   is working, it looks like this:
+   The first thing to do (once you have parrot and pirate installed)
+   is run the tests. If everything is working, it looks like this:
 
    % python PirateTest.py
-   .......................
+   ............................................
    --------------------------------------------
-   Ran 23 tests in 1.354s
+   Ran 56 tests in 3.354s
 
    OK
 
-
-   (where 23 is however many tests there are)
+   (where 56 is however many tests there are)
 
    If the tests aren't working on a fresh install of
    pirate and parrot, it either means:
@@ -32,7 +47,7 @@ RUNNING THE TESTS
        - something in parrot has changed 
        - someone checked in code that didn't pass the tests. 
        - your python compiler package is incompatible with mine
-         (2.3 is latest python, I'm using 2.2)
+         (2.3 is latest python, I'm using 2.2.3)
 
    But, hopefully it's working and we can move on. :)
 
@@ -89,8 +104,8 @@ THE PIRATE CODE GENERATOR FOR PYTHON
 
     Because so many languages have similar control structures,
     the plan is to eventually have a generic code generator 
-    that compilers for other languages can talk to. But for 
-    now, the code generator is python-specific.
+    that can be used for multiple languages. But for now, the 
+    code generator is python-specific.
 
     If you open pirate.py and scroll through, you will see that
     most of the file is one huge class called PirateVisitor and
@@ -102,22 +117,23 @@ THE PIRATE CODE GENERATOR FOR PYTHON
     and we instantiate a PirateVisitor to walk through it.
 
              NOTE: See Klaas-Jan Stol's report for an in-depth look
-                   at how parsers and ASTs and compilers in general
-                   work. His report is about Lua->Parrot but most of it 
-                   applies to python too:
+                   at how parsers, ASTs, and compilers in general
+                   work. His report is about a Lua->Parrot compiler
+                   (also called pirate) but most of it applies to 
+                   python too:
 
                    http://members.home.nl/joeijoei/parrot/report.pdf
 
 
     All the work of building the AST gets done in python's parser 
     and compiler packages. We just walk the tree for each node, 
-    call the appropriate  method our PirateVisitor instance. The
-    PirateVisitor builds up a list of strings, where each string
-    is a line of parrot code.
+    and call the appropriate method on our PirateVisitor instance.
+    The PirateVisitor builds up a list of strings as we go, where 
+    each string is a line of parrot intermediate code.
 
-    Each visitXxxx methods correspons to a keyword or operator in 
-    the python language, and contain templates for generating the
-    corresponding parrot code.
+    Each visitXxxx method corresponds to a keyword or operator in 
+    the python language, and contains a template for generating the
+    corresponding intermediate code.
 
     Let's look at two examples.
 
@@ -131,7 +147,12 @@ THE PIRATE CODE GENERATOR FOR PYTHON
     In fact, the code is a little hard to read. Currently there's a 
     lot of list-appending and string interpolation going on, so 
     these templates can be a little messy. It might help to just
-    try it out. Create a simple python file like this:
+    try it out. 
+ 
+
+    ## examining the compiled code #############################
+
+    Create a simple python file like this:
 
             while 1:
                pass
@@ -145,41 +166,58 @@ THE PIRATE CODE GENERATOR FOR PYTHON
 
         .sub __main__
             new_pad 0
-            setline 1                     # (set_lineno:82)
+            newsub P0, .Exception_Handler, __py__catch
+            set_eh P0
+            newclass P0, "PythonIterator"
+            setline 1
         while0:
-            $P0 = new PerlInt             # (visitWhile:473)
-            $P0 = new PerlInt             # (expressConstant:154)
-            $P0 = 1                       # (expressConstant:155)
-            unless $P0 goto endwhile0     # (visitWhile:475)
-            noop                          # (visitPass:549)
-            goto while0                   # (visitWhile:477)
+            unless 1 goto elsewhile0      # (visitWhile:712)
+            noop                          # (visitPass:816)
+            goto while0                   # (visitWhile:714)
+        elsewhile0:
         endwhile0:
-            end                           # (compile:596)
+            end                           # (compile:1019)
         .end
         .include 'pirate.imc'
+
 
      Which, if you ran it through parrot, would loop forever. :)
 
      Let's look a little closer at the generated code.
 
-     The comments on the right indicate which method and line
-     in the *compiler* resulted that particular line of code.
-     (The extra "new" is a bug, and yes, we're using PerlInt 
-     for now.)
+     The lines at the top without comments are boilerplate 
+     code that set up a default exception handler.
 
-     You'll notice the labels all end with 0. That's a product 
-     of PirateVisitor.symbol(), which appends a unique number 
-     to a string so we don't get a bunch of symbol clashes in 
-     code we pass to IMC.  (No good saying "goto endwhile"
-     if there's 50 while loops in the code)
+     The middle lines show the intermediate code that pirate
+     created. The comments on the right indicate which method 
+     and line in the *compiler* resulted that particular line 
+     of intermediate code.
 
-     BTW, you can also dump the code that each of the test cases uses. 
+     The last line includes the pirate standard library, which
+     defines runtime support routines written in parrot 
+     intermediate code. 
+
+     The lines ending in colons are labels, that allow you to
+     jump to different places in the code. You'll notice the 
+     labels all end with 0. That's a product of PirateVisitor.gensym(), 
+     which appends a unique number to a string so we don't get a 
+     bunch of symbol clashes in code we pass to parrot.  (No good 
+     saying "goto endwhile" if there's 50 "endwhile" labels in the code)
+
+
+     ## dumping code for the tests ########################
+
+     In addition to pirate's -d flag for dumping a file, you can 
+     You can also dump the code that each of the test cases uses. 
      Most of the tests pass dump=0 to self.run (and if one doesn't,
      you can add it in). Change the 0 to 1 and you'll see the code.
      The other parameter, lines, will show line numbers for the IMC
      code -- helpful if imcc gives you a nasty  message about something 
      on line 23. :)
 
+
+
+     ## more on PirateVisitor ##############################
 
      Okay, moving back to pirate.py: the other major thing to look 
      at in PirateVisitor is the expression() and various .xxExpression() 
@@ -192,6 +230,9 @@ THE PIRATE CODE GENERATOR FOR PYTHON
      a destination register, telling parrot where to store the 
      value. The expression() method takes care of this, and you'll
      notice these methods all have a "dest" parameter.
+
+
+     ## subroutine compiler: PirateSubVisitor ##############
 
      About the only other tricky thing right now is PirateSubVisitor. 
      This is actually just a subclass of PirateVisitor, so it can
@@ -207,5 +248,3 @@ THE PIRATE CODE GENERATOR FOR PYTHON
 
      Anyway, that's all for now. Hopefully it'll  get you started 
      working with Pirate. :)
-
-

@@ -1,47 +1,45 @@
 # $Id$
 
-pirate (python on parrot)
-
+####################################################
+#
+# PIRATE
+#
+####################################################
 
 ## status #########################################
 
-Pirate is an attempt by Michal Wallace (with tons
-of advice from the parrot crew on perl6-internals) 
-get python running on a parrot virtual machine.
+Pirate is an attempt to get python running 
+on the parrot virtual machine.
 
 It was originally based on amk's parrot-gen.py:
 
    http://www.amk.ca/conceit/parrot.html
 
 But has been extended considerably and updated
-to work with the new intermediate code compiler
-(imcc). Currently, pirate supports:
+to work with parrot's intermediate code compiler.
+Currently, pirate supports:
 
-    - print
-    - lists, strings, ints (but no methods on them)
+    - simple lists, strings, ints, dicts, and floats
     - assignment and multi-assignment ( x,y=1,2 )
-    - while, for, if/elif/else, break, continue
+    - while/else, for/else, if/elif/else, break, continue
+    - try...except blocks
+    - raise and assert
     - math operations (+, -, *, /, %)
     - boolean logic (and, or, not)
     - comparison operators
-    - function calls
-    - lambda
+    - functions and function calls
+    - lambdas
+    - parrot calling convention for functions
+    - list comprehensions
+    - generators
+    - proper scoping
 
 
 ## to-do list #####################################
 
-    - parrot calling convention for functions
-    - def
-    - list comprehensions
-    - yield
-    - proper scoping
-    - dict
-    - simple exceptions
-    - raise, assert
-    - try...except # if possible yet
-    - class
+    - classes
     - import
-    - ??
+    - lots of little details
 
 
 ## help wanted ####################################
@@ -83,7 +81,6 @@ If you want write access to cvs, drop me an email at
 michal@sabren.com
 
 
-
 ## running ########################################
 
 To (attempt to) run a python script through parrot:
@@ -93,7 +90,6 @@ To (attempt to) run a python script through parrot:
 To see the generated parrot code:
 
     pirate.py -d whatever.py
-
 
 
 ## pair programming? ##############################
@@ -118,5 +114,4 @@ dump=0 and lines=1. Set dump to 1 to show the
 generated code for a test, set lines to 0 to hide
 the line numbers (in case you want to pipe it
 to an *.imc file to play around with manually).
-
 
