@@ -60,10 +60,20 @@ class PirateTest(unittest.TestCase):
                 print 'walk the plank!'
             elif 1:
                 print 'avast, ye landlubbers!'
-            """)
+            """, dump=0)
         self.assertEquals(res,  "shiver me timbers!\n" \
                                  + "yar har har!\n" \
                                  + "avast, ye landlubbers!\n")
+        
+    def test_if_expr(self):
+        res = run(
+            """
+            n = 1
+            if n > 0:
+                print 'x'
+            """, dump=0)
+        self.assertEquals(res, "x\n")
+        
 
     def test_assignment(self):
         res = run(
@@ -100,9 +110,9 @@ class PirateTest(unittest.TestCase):
             """
             #@TODO: print 1<2<3
             print 1==1, 0!=0, 1>0, 1<=5,
-            print 1>=5, 4<>3
+            print 1>=5, 4<>3,
             """)
-        self.assertEquals(res, "1 0 1 1 0 1\n")
+        self.assertEquals(res, "1 0 1 1 0 1 ")
 
 
     def test_euclid(self):
@@ -126,6 +136,22 @@ class PirateTest(unittest.TestCase):
             print
             """, dump=0)
         self.assertEquals(res, "1 4 9 16 25 \n")
+
+    def test_break(self):
+        res = run(
+            """
+            for num in [1, 2, 3, 4, 5]:
+                print num, 
+                if num == 2: break
+            
+            num = 0
+            while 1:
+                num = num + 1
+                print num,
+                if num == 2: break
+            """)
+        self.assertEquals(res, "1 2 1 2 ")
+            
            
                                                                     
 if __name__=="__main__":

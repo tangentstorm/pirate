@@ -24,6 +24,7 @@ class PirateVisitor:
     def __init__(self):
         self._last_lineno = None
         self.lines = []
+        self.loops = []
         self.counter = {}
 
     def symbol(self, prefix):
@@ -203,7 +204,12 @@ class PirateVisitor:
             # if not true, goto _elif
             self.extend(self.set_lineno(test))
             _elif = self.symbol("_elif")
-            self.append("unless %s goto %s" % (test.value, _elif))
+            testvar = self.symbol("test")
+
+            self.append(".local object %s" % testvar)
+            self.append("%s = new PerlNum" % testvar)
+            self.extend(self.expression(test, testvar))
+            self.append("unless %s goto %s" % (testvar, _elif))
             
             # do it and goto _endif
             self.visit(body)
@@ -241,6 +247,7 @@ class PirateVisitor:
         self.extend(self.set_lineno(node))
         _while = self.symbol("while")
         _endwhile = self.symbol("endwhile")
+        self.loops.append((_while, _endwhile))
         self.append("%s:" % _while)
         testvar = self.symbol("$P")
         self.append("%s = new PerlInt" % testvar)
@@ -249,6 +256,7 @@ class PirateVisitor:
         self.visit(node.body)
         self.append("goto %s" % _while)
         self.append("%s:" % _endwhile)
+        self.loops.pop()
 
 
     def visitFor(self, node):
@@ -258,10 +266,13 @@ class PirateVisitor:
 
         self.extend(self.set_lineno(node))
         self.append(".local object %s" % node.assign.name)
-        forloop = self.symbol("_for")
+        _for = self.symbol("_for")
+        _endfor = self.symbol("_endfor")
         loopidx = self.symbol("idx")
         forlist = self.symbol("list")
         listlen = self.symbol("$I")
+
+        self.loops.append((_for, _endfor))
 
         # first get the list
         self.append(".local PerlArray %s" % forlist)
@@ -275,13 +286,21 @@ class PirateVisitor:
         self.append("%s = 0" % loopidx)
 
         # do the loop body
-        self.append("%s:" % forloop)
+        self.append("%s:" % _for)
         self.append("%s = %s[%s]" % (node.assign.name, forlist, loopidx))
         self.visit(node.body)
 
         # then increment the index and loop
         self.append("%s = %s + 1" % (loopidx, loopidx))
-        self.append("if %s < %s goto %s" % (loopidx, listlen, forloop))
+        self.append("if %s < %s goto %s" % (loopidx, listlen, _for))
+        self.append("%s:" % _endfor)
+        
+        self.loops.pop()
+
+    def visitBreak(self, node):
+        assert self.loops, "break outside of loop" # SyntaxError
+        self.append("goto %s" % self.loops[-1][1])
+
 
         
 ## module interface ###############################################
