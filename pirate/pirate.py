@@ -554,7 +554,7 @@ class PirateVisitor(object):
         list = self.compileExpression(node.expr, allocate=-1)
         slice = self.expressSlice(node.lower, node.upper)
         dest = self.gensym()
-        self.append("set %s[%s], %s" % (list,slice,value))
+        self.append("%s[%s] = %s" % (list,slice,value))
         return dest
 
     def callingExpression(self, node, allocate):
