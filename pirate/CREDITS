@@ -23,6 +23,10 @@ Many thanks to:
     compiler, writing an extremely informative report, and
     working with me on the s-expression compiler.
 
+ Gregoire Dooms  (http://www.dooms.org/)
+    for helping me figure out how to compile my first
+    attempt at embedding python objects in c :)
+
  Dan Sugalski ( http://www.sidhe.org/~dan/blog/ )
     for the "What the heck is..." category in his blog,
     leading the parrot project, and for the pie-thon
