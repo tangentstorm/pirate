@@ -68,7 +68,6 @@ class PirateVisitor(object):
         self.vars = {}
         self.depth = depth or 0 # lexical scope depth
         self.globals = {}
-        self.classKnown = [] # only make one constructor per class
         self.classStack = [] # the class we're looking at right now
 
     def gensym(self, prefix="$P", type="object"):
@@ -96,7 +95,6 @@ class PirateVisitor(object):
         res += "    new_pad 0\n"
         res += "    newsub P0, .Exception_Handler, __py__catch\n"
         res += "    set_eh P0\n"
-        res += "    newclass P0, \"PythonIterator\" \n"
         res += "\n".join(self.lines) + "\n"
         res += ".end\n"
         res += "\n\n".join([s.getCode() for s in self.subs]) + "\n"
@@ -196,16 +194,15 @@ class PirateVisitor(object):
         return meth(node, allocate)
 
     constMap = {
-        str: "PerlString",
-        int: "PerlInt",
-        float: "Float"
+        str: "PyString",
+        int: "PyInt",
+        float: "PyFloat"
     }
 
 
     def expressConstant(self, node, allocate):
         t = type(node.value)
         assert t in self.constMap, "unsupported const type:%s" % t
-
         r = repr(node.value)
         if r.startswith("'") and r.endswith("'"):
             r = r.replace('"','\\"')
@@ -213,7 +210,8 @@ class PirateVisitor(object):
             r = r.replace("\\'","'")
         if allocate:
             dest = self.gensym("const")
-            self.append("%s = new %s" % (dest, self.constMap[t]))
+            self.append("find_type $I0, \"%s\"" % self.constMap[t])
+            self.append("new %s, $I0" % dest)
             self.append("%s = %s" % (dest, r))
             return dest
         else:
@@ -223,7 +221,8 @@ class PirateVisitor(object):
     def expressDict(self, node, allocate):
         self.set_lineno(node)
         dest = self.gensym("dict")
-        self.append("%s = new PerlHash" % dest)
+        self.append('find_type $I0, "PyDict"')
+        self.append("new %s, $I0" % dest)
         if node.items:
             key = self.gensym("key", "Key")
             for k,v in node.items:
@@ -238,11 +237,11 @@ class PirateVisitor(object):
 
     def assertNotUndefined(self, what, error):
         # @TODO: remove thess runtime checks once Pyobjects work
-        # parrotclass.getprop returns PerlUndef if not present so:
+        # parrotclass.getprop returns PyNone if not present so:
         endCheck = self.genlabel("endCheck")
         self.append("typeof $S0, %s" % what)
         #self.append("print $S0")
-        self.append("unless $S0 == 'PerlUndef' goto %s" % endCheck)
+        self.append("unless $S0 == 'PyNone' goto %s" % endCheck)
         ex = ast.Raise(ast.Const(error), None, None)
         self.visit(ex)
         self.append("%s:" % endCheck)
@@ -296,16 +295,18 @@ class PirateVisitor(object):
         return dest
 
     def listExpression(self, expr, allocate):
-        dest = self.gensym("list", "PerlArray")
-        self.append(dest + " = new PerlArray")
+        dest = self.gensym("list", "object")
+        self.append('find_type $I0, "PyList"')
+        self.append("new %s, $I0" % dest)
         for item in expr.nodes:
             sym = self.compileExpression(item)
             self.append("push %s, %s" % (dest, sym))
         return dest
 
     def tupleExpression(self, expr, allocate):
-        dest = self.gensym("list", "FixedPMCArray")
-        self.append(dest + " = new FixedPMCArray")
+        dest = self.gensym("list", "object")
+        self.append('find_type $I0, "PyTuple"')
+        self.append("new %s, $I0" % dest)
         self.append("%s=%d" % (dest,len(expr.nodes)))
         for i in range(0,len(expr.nodes)):
             sym = self.compileExpression(expr.nodes[i])
@@ -328,7 +329,8 @@ class PirateVisitor(object):
         dest = self.gensym("unary")
         value = self.compileExpression(node.expr)
         op = self.unaryOps[node.__class__]
-        self.append(dest + " = new PerlUndef")
+        self.append('find_type $I0, "PyObject"')
+        self.append("new %s, $I0" % dest)
         self.append("%s = %s%s" % (dest, op, value))
         return dest
 
@@ -345,7 +347,8 @@ class PirateVisitor(object):
         for n in node.nodes[1:]:
             next = self.compileExpression(n)
             tmp = self.gensym("tmp")
-            self.append(tmp + " = new PyObject")
+            self.append('find_type $I0, "PyObject"')
+            self.append("new %s, $I0" % tmp)
             self.append("%s = %s %s %s" % (tmp, value, op, next))
             value = tmp
                
@@ -365,7 +368,8 @@ class PirateVisitor(object):
         
     def infixExpression(self, node, allocate):
         dest = self.gensym("infix")
-        self.append("%s = new PerlUndef" % dest)
+        self.append('find_type $I0, "PyObject"')
+        self.append("new %s, $I0" % dest)
         lside = self.compileExpression(node.left, allocate=1)
         rside = self.compileExpression(node.right)
         if rside.startswith('"'):
@@ -388,7 +392,7 @@ class PirateVisitor(object):
 
     def compareExpression(self, expr, allocate):
         assert len(expr.ops) == 1, "@TODO: multi-compare not working yet"
-        dest = self.gensym("compare", "Boolean")
+        dest = self.gensym("compare", "object")
         # get left side:
         symL = self.compileExpression(expr.expr, allocate=1)
 
@@ -401,7 +405,8 @@ class PirateVisitor(object):
 
         _cmp = self.genlabel("cmp")
         _end = self.genlabel("endcmp")
-        self.append("%s = new Boolean" % dest)
+        self.append('find_type $I0, "PyBoolean"')
+        self.append("new %s, $I0" % dest)
         self.append("if %s %s %s goto %s" % (symL, op, symR, _cmp))
         self.append("%s = 0" % dest)
         self.append("goto %s" % _end)
@@ -422,14 +427,16 @@ class PirateVisitor(object):
         if operator == "!":            
             dest = self.genlabel("tmp")
             tmp = self.compileExpression(expr.expr, allocate=1)
-            self.append(".local Boolean %s" % dest)
-            self.append("%s = new Boolean" % dest)
+            self.append(".local object %s" % dest)
+            self.append('find_type $I0, "PyBoolean"')
+            self.append("new %s, $I0" % dest)
             self.append("not %s, %s" % (dest,tmp))
         else:
             L,R = expr.nodes
             tmp = self.genlabel("tmp")
-            self.append(".local Boolean %s" % tmp)
-            self.append("%s = new Boolean" % tmp)
+            self.append(".local object %s" % tmp)
+            self.append('find_type $I0, "PyBoolean"')
+            self.append("new %s, $I0" % tmp)
             dest = self.compileExpression(L, allocate=1)
             tmp = self.compileExpression(R, allocate=1) # until we come up with an unboxing scheme
             self.append("%s %s, %s, %s" % (operator, dest, dest, tmp))
@@ -439,29 +446,24 @@ class PirateVisitor(object):
         assert not (node.star_args or node.dstar_args), \
                "@TODO: f(*x,**y) not working yet"
         
-        args = []
-        for arg in node.args:
-            var = self.compileExpression(arg, allocate=1)
-            #self.append(".local object %s" % var)
-            args.append(".arg %s" % var)
+        args = [self.compileExpression(arg, allocate=1) for arg in node.args]
+        args=",".join(args)
+
+        dest = self.gensym("result")
 
         # figure out what we're calling
         if isinstance(node.node, ast.Lambda):
             # lambdas don't have names!
             sub_pmc = self.lambdaExpression(node.node, allocate=0)
+            self.append("%s = %s(%s)" % (dest,sub_pmc,args))
         elif isinstance(node.node, ast.Getattr):
-            sub_pmc = self.compileExpression(node.node)
+            obj = self.compileExpression(node.node.expr)
+            self.append("%s=%s.%s(%s)" % (dest,obj,node.node.attrname,args))
         else:
             sub_pmc = self.lookupName(node.node.name)
+            func = self.compileExpression(node.node, allocate=1)
+            self.append("%s=%s(%s)" % (dest,func,args))
 
-        ## now call it:
-        self.append(".pcc_begin non_prototyped")
-        for r in args:
-            self.append(r)
-        self.append('.pcc_call %s' % sub_pmc)
-        dest = self.gensym("result")
-        self.append(".result %s" % dest)
-        self.append(".pcc_end")
         return dest
 
 
@@ -504,7 +506,8 @@ class PirateVisitor(object):
         self.subs.append(pir)
 
         # store the address in dest
-        self.append("newsub %s, .Closure, %s" % (ref, sub))
+        self.append('find_type $I0, "PyFunc"')
+        self.append("newsub %s, $I0, %s" % (ref, sub))
         if allocate:
             self.append(self.bindLocal(node.name, ref))
             self.vars[ref] = ref
@@ -530,7 +533,8 @@ class PirateVisitor(object):
         self.set_lineno(node)
         dest = self.gensym("listcomp")
         lcval = self.gensym("lcval")
-        self.append(dest + " = new PerlArray")
+        self.append('find_type $I0, "PyList"')
+        self.append("new %s, $I0" % dest)
         queue = node.quals + [ListCompExpr(node.expr, dest)]
         self.visit(self.comprehend(queue))
         return dest
@@ -697,7 +701,7 @@ class PirateVisitor(object):
             lhs = ast.Subscript(aug.node.expr, 'OP_ASSIGN', aug.node.subs)
 
         ops = {'**=':'Power', '*=':'Mul', '/=':'Div', '//=':'FloorDiv',
-               '%=':'Mod', '+=':'Add', '-=':'Sub',
+               '%=':'Mod', '+=':'Add', '-=':'Sub', 
                '<<=':'LeftShift', '>>=':'RightShift',
                '|=':'Bitor', '^=':'Bitxor', '&=':'Bitand'}
         op_node_class = getattr(ast, ops[aug.op])
@@ -925,42 +929,16 @@ class PirateVisitor(object):
     def visitClass(self, node):
         name = node.name
         klass = self.gensym("klass", "object")
+        genname = self.genlabel(self.name + "_" + str(name))
         
-        # Python classes need to be callable, but ParrotClass
-        # is not. So we make a constructor instead.
-        # Classes with the same name will have identical
-        # constructors, so no need to create several versions:
+        self.append("getclass $P0, 'PyClass'")
+        self.append("subclass %s, $P0, '%s'" % (klass, genname))
+        self.append("register %s" % klass)
 
-        if name not in self.classKnown:
-
-            self.append("newclass %s, '%s'" % (klass, name))
-            self.append("register %s" % klass)
-
-            sub = []
-            sub.append(".pcc_sub __new__%s non_prototyped" % name)
-            sub.append("    .local object instance")
-            sub.append("    find_type $I0, '%s'" % name)
-            sub.append("    new instance, $I0")
-            # calling conventions say P0 is this "ConstructorClass" sub
-            # so this lets us do instance.__class__.__name__ ...
-            sub.append("    setprop instance, '__class__', P0") 
-            sub.append("    .pcc_begin_return")
-            sub.append("        .return instance")
-            sub.append("    .pcc_end_return")
-            sub.append(".end") 
-            self.classKnown.append(name)
-
-            # Adds the new sub we just made to the subs list.
-            # @TODO: mmm... smells like javascript (refactor me!)
-            class Object: pass
-            subObj = Object()
-            subObj.getCode = lambda: "\n".join(sub)
-            self.subs.append(subObj)
-
-        # now make the constructor object:
-        self.append("newsub %s, .Sub, __new__%s" % (klass, name))
+        # now set the name attribute
         namesym = self.gensym("name")
-        self.append(namesym + " = new PerlString")
+        self.append('find_type $I0, "PyString"')
+        self.append("new %s, $I0" % namesym)
         self.append("%s = '%s'" % (namesym, name))
         self.append("setprop %s, '__name__', %s" % (klass, namesym))
         self.append(self.bindLocal(name, klass))
@@ -999,7 +977,7 @@ class PirateSubVisitor(PirateVisitor):
         res = []
         if self.doc:
             res.append("# %s" % self.doc)
-        res.append(".pcc_sub %s non_prototyped" % self.name)
+        res.append(".sub %s non_prototyped" % self.name)
         for arg in self.args:
             res.append("    .param object " + arg)
         res.append("    new_pad %s" % self.depth) #@TODO: use -1 here??
@@ -1009,9 +987,7 @@ class PirateSubVisitor(PirateVisitor):
         res.append("    #------")
         res.append("    .local None none")
         res.append("    none=new None")
-        res.append("    .pcc_begin_return")
-        res.append("    .return none")
-        res.append("    .pcc_end_return")
+        res.append("    .return (none)")
         res.append(".end")
         res.append("")
         return "\n".join(res)
@@ -1023,22 +999,19 @@ class PirateSubVisitor(PirateVisitor):
 
         name = self.name
         res = []
-        res.append(".pcc_sub %s non_prototyped" % name)
+        res.append(".sub %s non_prototyped" % name)
         res.append("   .local object gen_fun")
         res.append("   .local object gen_obj")
-        res.append("   .local int iterator_type")
 
         res.append("   newsub gen_fun, .Coroutine, %s_g" % name)
-        res.append('   find_type iterator_type, "PythonIterator"')
-        res.append("   new gen_obj, iterator_type")
+        res.append('   find_type $I0, "PyGen"')
+        res.append("   new gen_obj, $I0")
         res.append("   setprop gen_obj, 'next', gen_fun")
 
-        res.append("   .pcc_begin_return")
-        res.append("   .return gen_obj")
-        res.append("   .pcc_end_return")
+        res.append("   .return (gen_obj)")
         res.append(".end")
 
-        res.append(".pcc_sub %s_g non_prototyped" % name)
+        res.append(".sub %s_g non_prototyped" % name)
         res.append("   new_pad -1")
         res.extend(self.lines)
         res.append(".end")
@@ -1062,25 +1035,13 @@ class PirateSubVisitor(PirateVisitor):
         #@TODO: allow both yield and return in one function
         result = self.compileExpression(node.value, allocate=1)
         self.append("pop_pad")
-        self.append(".pcc_begin_return")
-        self.append(".return " + result)
-        self.append(".pcc_end_return")
+        self.append(".return (" + result + ")")
 
     def visitYield(self, node):
         self.isGenerator = 1
         result = self.compileExpression(node.value, allocate=1)
-        next = self.gensym("next", "object")
-        self.append("newsub %s, .Coroutine, label_%s" % (next,next))
 
-        # P5 is the generator object. We know this because we
-        # set it in getattr so we'd comply with the calling
-        # conventions.
-        self.append("setprop P5, 'next', %s" % next)
-
-        self.append(".pcc_begin_yield")
-        self.append(".return " + result)
-        self.append(".pcc_end_yield")
-        self.append("label_%s:" % next)
+        self.append(".yield (" + result + ")")
 
                 
 ## module interface ###############################################
@@ -1104,11 +1065,11 @@ def compile(src, name="__main__"):
     pir.append("end")
     #@TODO: refactor this mess:
     if name=="__main__":
-        lines = ["    .local object builtin"]
+        lines = ['    loadlib P1, "python_group"',
+                 "    .local object builtin"]
         for builtin in ['abs','cmp','float','hex','int','oct','range']:
             lines += ["    newsub builtin, .Sub, __builtin___%s0" % builtin,
                       "    store_lex 0, '%s', builtin" % builtin]
-
         pir.lines = lines + pir.lines
     code =  pir.getCode()
     return code
@@ -1118,7 +1079,7 @@ def line_nos(seq):
     return [(i+1, seq[i]) for i in range(len(seq))]
 
 def invoke(src, dump=0, lines=0):
-    i,o = os.popen4("parrot --python -")
+    i,o = os.popen4("parrot -")
     code = compile(src)
     if dump:
         print

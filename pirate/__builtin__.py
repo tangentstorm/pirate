@@ -3,6 +3,13 @@
 # http://codespeak.net/viewcvs.cgi/pypy/trunk/src/pypy/module/
 
 
+def abs(x): return x.__abs__()
+def cmp(x,y): return x.__cmp__(y)
+def float(x): return x.__float__()
+def hex(x): return x.__hex__()
+def int(x): return x.__int__()
+def oct(x): return x.__oct__()
+
 #def range(x, y=None, step=1):
 def range(x, y, step):    
     """
@@ -34,8 +41,8 @@ def range(x, y, step):
 
     PARROT_INLINE('find_lex $P0, "howmany"')
     PARROT_INLINE('$I0 = $P0')
-    PARROT_INLINE('.local object arr')
-    PARROT_INLINE('arr = new PerlArray ') 
+    PARROT_INLINE('.local PyList arr')
+    PARROT_INLINE('arr = new PyList ') 
     PARROT_INLINE('set arr, $I0') 
     #@TODO: arr = [None] * howmany  # this is to avoid using append.
 
