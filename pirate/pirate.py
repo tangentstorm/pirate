@@ -647,37 +647,38 @@ class PirateVisitor(object):
             # the children if present, or just the node in a list
             return getattr(side,"nodes",[side])
 
-        lside = listify(node.nodes[0])
         rside = listify(node.expr)
 
-        
-        if len(rside)==0 or len(lside)==1:
-            # eg, x = []
-            self.assign(lside[0],
-                        self.compileExpression(node.expr, allocate=1))
+        for lside in node.nodes: 
+            lside = listify(lside)
 
-        elif (len(lside) == len(rside)):
-            ## this works for l=r AND l=r,r,r,r
-            ## because of AssTuple nodes :)
-            for node, expr in zip(lside, rside):
-                self.assign(node, self.compileExpression(expr, allocate=1))
+            if len(rside)==0 or len(lside)==1:
+                # eg, x = []
+                self.assign(lside[0],
+                            self.compileExpression(node.expr, allocate=1))
 
-        elif len(rside)==1:
-            ## this handles l,l,l=r and l,l,l=r()
-            rside = rside[0]
-            if isinstance(rside, ast.Const):
-                ## @TODO: non-sequence check should be at *runtime*
-                raise TypeError("unpack non-sequence")
+            elif (len(lside) == len(rside)):
+                ## this works for l=r AND l=r,r,r,r
+                ## because of AssTuple nodes :)
+                for node, expr in zip(lside, rside):
+                    self.assign(node, self.compileExpression(expr, allocate=1))
+    
+            elif len(rside)==1:
+                ## this handles l,l,l=r and l,l,l=r()
+                rside = rside[0]
+                if isinstance(rside, ast.Const):
+                    ## @TODO: non-sequence check should be at *runtime*
+                    raise TypeError("unpack non-sequence")
+                else:
+                    value = self.compileExpression(rside)
+                    for (i, node) in enumerate(lside):
+                        extract = self.gensym()
+                        self.append("%s = %s[%s]" % (extract, value, i))
+                        self.assign(node, extract)
             else:
-                value = self.compileExpression(rside)
-                for (i, node) in enumerate(lside):
-                    extract = self.gensym()
-                    self.append("%s = %s[%s]" % (extract, value, i))
-                    self.assign(node, extract)
-        else:
-            ## i don't THINK there are any other combinations... (??)
-            ## @TODO: unpack wrong size check should also be at runtime
-            raise ValueError("unpack sequence of wrong size")
+                ## i don't THINK there are any other combinations... (??)
+                ## @TODO: unpack wrong size check should also be at runtime
+                raise ValueError("unpack sequence of wrong size")
 
     ##[ augmented assign ]#########################################
 
