@@ -1,46 +1,6 @@
 ## pirate standard library
 
 #
-# getattr()
-#
-.pcc_sub __py__getattr prototyped
-    .param object obj
-    .param string name
-    #@TODO: .param ifNone
-
-    .local object result
-    .local object class
-
-    ## first try the obj
-    getprop result, name, obj
-    typeof $S0, result
-    unless $S0 == 'PerlUndef' goto done
-
-    ## next look for a __class__
-    getprop class, '__class__', obj
-    typeof $S0, class
-    if $S0 == 'PerlUndef' goto noClass
-
-    ## we have a class, so look for the attribute
-    getprop result, name, class
-    typeof $S0, result
-    unless $S0 == 'PerlUndef' goto done
-
-noClass:
-
-notFound:
-    $S0 = "AttributeError: "
-    concat $S0, name
-    __py__raise($S0)
-
-done:
-    .pcc_begin_return
-    .return result
-    .pcc_end_return
-.end
-
-
-#
 # raise
 #
 .pcc_sub __py__raise

@@ -281,7 +281,7 @@ class PirateVisitor(object):
 
         self.set_lineno(node)
         obj = self.compileExpression(node.expr, allocate=1)
-        self.append("%s = __py__getattr(%s, '%s')" % (dest, obj, attr))
+        self.append("getattribute %s, %s, '%s'" % (dest, obj, attr))
 
         # save base object in P% for calling conventions
         # @TODO: only do this if we're going to call the attr
