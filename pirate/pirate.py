@@ -17,7 +17,12 @@ usage:  pirate.py [-d] filename.py
 import os
 import compiler
 import traceback
-from compiler import ast        
+from compiler import ast
+
+
+def enumerate(seq):
+    return [(i,seq[i]) for i in range(len(seq))]
+
 
 class imclist(list):
     """
@@ -116,6 +121,8 @@ class PirateVisitor(object):
             ast.Dict:      self.expressDict,
             ast.Subscript: self.expressSubscript,
             ast.ListComp:  self.expressListComp,
+
+            ast.Getattr:   self.expressGetattr,
             
             # old style (return nothing)
             ast.Name:     self.nameExpression,
@@ -202,10 +209,21 @@ class PirateVisitor(object):
             return dest
         else:
             return slot
+
+
+    def expressGetattr(self, node, dest, allocate):
+        self.set_lineno(node)
+        attr = node.attrname
+        obj = self.symbol("obj")
+        self.append(".local object %(obj)s" % locals())
+        self.append("%(dest)s = new PerlUndef" % locals())
+        self.compileExpression(node.expr, obj, allocate=1)
+        self.append("getprop %(dest)s, '%(attr)s', %(obj)s" % locals())
+        return dest
     
         
-    def nameExpression(self, expr, dest, allocate):
-        self.append("find_lex %s, '%s'" % (dest, expr.name))
+    def nameExpression(self, node, dest, allocate):
+        self.append("find_lex %s, '%s'" % (dest, node.name))
 
 
     def listExpression(self, expr, dest, allocate):
@@ -386,8 +404,8 @@ class PirateVisitor(object):
         self.append(".pcc_end")
 
 
-    def lambdaExpression(self, node, dest, allocate=1):
-        return self.genFunction(node,dest,allocate)
+    def lambdaExpression(self, node, dest, allocate=0):
+        return self.genFunction(node,dest,allocate=0)
 
 
     def genFunction(self, node, dest, allocate=1):
@@ -428,7 +446,8 @@ class PirateVisitor(object):
         if allocate:
             self.append("store_lex -1, '%s', %s" % (dest, ref))
             self.vars[dest] = dest
-        else:
+        elif dest:
+            #pass
             self.append("%s = %s" % (dest, ref))
 
 
@@ -536,44 +555,80 @@ class PirateVisitor(object):
         self.append("%(_endif)s:" % locals())
 
 
-    def visitAssign(self, node):
-        leftside = node.nodes[0]
-        rightside = node.expr
-        if isinstance(leftside, ast.AssTuple) \
-        or isinstance(leftside, ast.AssList):
-            leftside = leftside.nodes
-            rightside = rightside.nodes
-        elif isinstance(leftside, ast.AssName) \
-          or isinstance(leftside, ast.Subscript): 
-            leftside = [leftside]
-            rightside = [rightside]
+    ##[ assignment ]################################################
+
+    def assignToSubscript(self, node, value):
+        slot = self.expressSubscript(node, dest=None, allocate=0)
+        self.append("%(slot)s = %(value)s" % locals())
+
+
+    def assignToProperty(self, node, value):
+        obj = self.symbol("obj")
+        self.append(".local object %(obj)s" % locals())
+        self.compileExpression(node.expr, obj)
+        attr = node.attrname
+        self.append("setprop %(obj)s, '%(attr)s', %(value)s" %locals())
+
+
+    def assignToName(self, node, value):
+        name = node.name
+        if name in self.globals:
+            self.append("store_lex  0, '%(name)s', %(value)s" % locals())
         else:
-            raise NotImplementedError, \
-                  "don't how to handle %s" % leftside.__class__.__name__
-            
-        for node, expr in zip(leftside, rightside):
+            self.append("store_lex -1, '%(name)s', %(value)s" % locals())
 
-            if isinstance(node, ast.Subscript):
 
-                slot = self.expressSubscript(node, dest=None, allocate=0)
-                value = self.symbol("value")
-                self.append(".local object %(value)s" % locals())                
-                self.compileExpression(expr, value)
-                self.append("%(slot)s = %(value)s" % locals())
+    def assign(self, node, value):
+        if isinstance(node, ast.Subscript):
+            self.assignToSubscript(node, value)
+        elif isinstance(node, ast.AssAttr):
+            self.assignToProperty(node, value)
+        else:
+            self.assignToName(node, value)
 
+    def evaluate(self, expr):
+        value = self.symbol("value")
+        self.append(".local object %(value)s" % locals())
+        self.compileExpression(expr, value)
+        return value
+
+
+    def visitAssign(self, node):
+
+        def listify(side):
+            # the children if present, or just the node in a list
+            return getattr(side,"nodes",[side])
+
+        lside = listify(node.nodes[0])
+        rside = listify(node.expr)
+
+        if (len(lside) == len(rside)):
+            ## this works for l=r AND l=r,r,r,r
+            ## because of AssTuple nodes :)
+            for node, expr in zip(lside, rside):
+                self.assign(node, self.evaluate(expr))
+
+        elif len(rside)==1:
+            ## this handles l,l,l=r and l,l,l=r()
+            rside = rside[0]
+            if isinstance(rside, ast.Const):
+                ## @TODO: non-sequence check should be at *runtime*
+                raise TypeError("unpack non-sequence")
             else:
-                name = node.name
-                #@TODO: get rid of local object nonsense here...
-                if isinstance(expr, ast.Lambda):
-                    self.compileExpression(expr, name)
-                else:
-                    self.append(".local object %s" % name)
-                    self.compileExpression(expr, name)
-                    if name in self.globals:
-                        self.append("store_lex  0, '%s', %s" % (name,name))
-                    else:
-                        self.append("store_lex -1, '%s', %s" % (name,name))
+                value = self.evaluate(rside)
+                extract = self.symbol("extract")
+                self.append(".local object %(extract)s" % locals())
+                for (i, node) in enumerate(lside):
+                    self.append("%(extract)s = %(value)s[%(i)s]" % locals())
+                    self.assign(node, extract)
+        else:
+            ## i don't THINK there are any other combinations... (??)
+            ## @TODO: unpack wrong size check should also be at runtime
+            raise ValueError("unpack sequence of wrong size")
 
+
+
+    ##[ control stuctures ]#########################################
 
     def visitWhile(self, node):
         assert node.else_ is None, "while...else not supported"
@@ -668,8 +723,9 @@ class PirateVisitor(object):
 
     def visitFunction(self, node):  # visitDef
         self.genFunction(node, node.name, allocate=1)
+
                 
-    ## exceptions #########################
+    ##[ exceptions ]####################################################
 
     def visitRaise(self, node):
         assert node.expr1, "argument required for raise"
@@ -704,6 +760,7 @@ class PirateVisitor(object):
                     % locals())
         self.append("set_eh %(handler)s" % locals())
         self.visit(node.body)
+        self.append("clear_eh") #@TODO: this, but it triggers a coredump :)
         self.append("goto %(endtry)s" % locals())
         self.append("%(catch)s:" % locals())
         for hand in node.handlers:
@@ -711,7 +768,7 @@ class PirateVisitor(object):
             assert not (expr or target), "can't get exception object yet" #@TODO
             self.visit(body)
         self.append("%(endtry)s:" % locals())
-        #self.append("clear_eh") #@TODO: this, but it triggers a coredump :)
+
                 
         
     def visitTryFinally(self, node):
@@ -723,11 +780,24 @@ class PirateVisitor(object):
                     % locals())
         self.append("set_eh %(handler)s" % locals())
         self.visit(node.body)
+        self.append("clear_eh") #@TODO
         self.append("%(final)s:" % locals())
-        #self.append("clear_eh") #@TODO
         self.visit(node.final) 
-        
 
+
+    def visitClass(self, node):
+        name = node.name
+        klass = self.symbol("klass")
+        cname = self.symbol("cname")
+        self.append(".local object %(klass)s" % locals())
+        self.append(".local object %(cname)s" % locals())
+        self.append("newclass %(klass)s, '%(name)s'" % locals())
+        self.append("%(cname)s = new PerlString" % locals())
+        self.append("%(cname)s = '%(name)s'" % locals())
+        self.append("setprop %(klass)s, '__name__', %(cname)s" % locals())
+        self.append("store_lex -1, '%(name)s', %(klass)s" % locals())
+
+        
 
 class PirateSubVisitor(PirateVisitor):
     """

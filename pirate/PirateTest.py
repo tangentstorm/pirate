@@ -42,6 +42,30 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "1 2 3 f g\n")
 
 
+    def test_unpack_wrong_size(self):
+        try:
+            res = self.run(
+                """
+                a,b = 1,2,3
+                """, dump=0)
+            gotError = 0
+        except ValueError:
+            gotError = 1
+        assert gotError, "should get unpack sequence wrong size ValueError"
+            
+
+    def test_unpack_non_sequence(self):
+        try:
+            res = self.run(
+                """
+                a,b = 5
+                """, dump=0)
+            gotError = 0
+        except TypeError:
+            gotError = 1
+        assert gotError, "should get unpack non-sequence TypeError"
+            
+
     def test_simplemath(self):
         res = self.run(
             """
@@ -227,7 +251,7 @@ class PirateTest(unittest.TestCase):
             """
             f = lambda x: x+1
             print f(4), f(5)
-            """, dump=0, lines=0)
+            """, dump=0, lines=1)
         self.assertEquals(res, "5 6\n")
 
         
@@ -237,6 +261,36 @@ class PirateTest(unittest.TestCase):
             print (lambda x: x*x)(5)
             """, dump=0, lines=0)
         self.assertEquals(res, "25\n")
+
+## @TODO: fix lambda/tuple syntax bug
+##
+##     def test_lambda_syntax_bug(self):
+##         res = self.run(
+##             ### the following SHOULD produce
+##             ### a runtime error saying that
+##             ### tuples are not callable.
+##             ###
+##             ### (because it's a 3-tuple):
+##             ###
+##             ###    lambda: 1
+##             ###    2
+##             ###    3
+##             ###
+##             ### but it doesn't. :)
+##             """
+##             a,b,c = (lambda: 1,2,3)()
+##             """, dump=1, lines=1)
+
+
+    def test_return_tuple(self):
+        res = self.run(
+            """
+            a, b, c = (lambda: (1,2,3))()
+            print a, b, c
+            a = (lambda: (4,5,6))()
+            print a
+            """, dump=0, lines=1)
+        self.assertEquals(res, "1 2 3\n[4, 5, 6]\n")
 
 
     def test_def(self):
@@ -397,6 +451,44 @@ class PirateTest(unittest.TestCase):
                 print '5',
             """, dump=0)
         self.assertEquals(res, "1 3 4 5 ")
+
+    def test_clear_eh(self):
+        res = self.run(
+            """
+            try:
+               pass
+            except:
+               print 'do not enter'
+            raise 'hell'
+            """, dump=0)
+        self.assertEquals(res, "hell\n")
+
+
+
+    ## object oriented stuff #####################
+
+    ## @TODO: implement objects
+    ## (waiting on python PMC's or parrot object layer)
+
+    def test_class(self):
+        res = self.run(
+            """
+            class Stuff:
+                x = 'x'
+            print Stuff.__name__ #@TODO:, Stuff.x
+            """, dump=0)
+        self.assertEquals(res, "Stuff\n")
+
+    def test_instance(self):
+        res = self.run(
+            """
+            class Thing:
+                pass
+            x = Thing #@TODO: Thing()
+            x.y = 1
+            print x.y
+            """, dump=0)
+        self.assertEquals(res, "1\n")
 
     
 
