@@ -875,7 +875,10 @@ class PirateVisitor(object):
         assert not (node.expr2 or node.expr3), "only 1 arg alllowed for raise"
         self.set_lineno(node)
         msg = self.compileExpression(node.expr1)
-        self.append("__py__raise(%s)" % msg)
+        exceptsym = self.gensym("except")
+        self.append("new %s, .Exception" % exceptsym)
+        self.append('%s["_message"] = %s' % (exceptsym, msg))
+        self.append("throw %s" % exceptsym)
 
     def visitAssert(self, node):
         # another tree transformation -- if not .test: raise .fail

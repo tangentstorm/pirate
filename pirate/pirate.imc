@@ -1,19 +1,6 @@
 ## pirate standard library
 
 #
-# raise
-#
-.pcc_sub __py__raise
-    .param string message
-    new $P0, .Exception
-    $P0["_message"] = message
-    throw $P0
-    .pcc_begin_return
-    .pcc_end_return
-.end
-
-
-#
 # top level python exception handler
 #
 .pcc_sub __py__catch non_prototyped
