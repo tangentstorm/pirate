@@ -1,0 +1,16 @@
+/* piobject.pmc
+ *     $Id$
+ */
+
+#include "Python.h"
+#include "parrot/parrot.h"
+
+#define enum_class_PiSequence  -1
+
+pmclass PiSequence need_ext dynpmc  {
+  
+  INTVAL get_integer () {
+    return 0;
+  }
+  
+}

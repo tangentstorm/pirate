@@ -1,0 +1,12 @@
+/* piobject.pmc
+ *     $Id$
+ */
+
+#include "Python.h"
+#include "parrot/parrot.h"
+
+#define enum_class_PiString  -1
+
+pmclass PiString extends PiSequence need_ext dynpmc  {
+  
+}

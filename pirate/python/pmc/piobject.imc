@@ -1,0 +1,39 @@
+
+.sub __main__
+
+    loadlib P1, "pirate"
+    find_type I1, "PiSequence"
+    print I1
+    print "\n"
+
+  #  loadlib P1, "pistring"
+    find_type I0, "PiString"
+    print I0
+    print "\n"
+
+  #  loadlib P1, "piobject"
+    find_type I0, "PiObject"
+    print I0
+    print "\n"
+
+    new P0, I0
+    set S0, P0
+    if S0=="None" goto okay
+    print "bad Py_None! expted 'None', got: "
+    print S0
+    print "\n"
+    goto done
+ okay:
+    set P0, "x"
+    mul P0, 2
+    set S0, P0
+    unless S0=="xx" goto bad
+    print "IT WORKED!\n"
+    goto done
+ bad:
+    print "it didn't work. expected xx, got:\n"
+    print S0
+    print "\n"
+ done:    
+    end
+.end

@@ -1,0 +1,57 @@
+/* piobject.pmc
+ *     $Id$
+ */
+
+#include "Python.h"
+#include "parrot/parrot.h"
+
+
+int PIRATE_INITIALIZED = 0;
+
+void PIRATE_initialize(void) {
+  // basically we trick pyhton into thinking it has an interpreter:
+  if (! PIRATE_INITIALIZED) {
+    PyThreadState_Swap(PyThreadState_New(PyInterpreterState_New()));
+  }
+  PIRATE_INITIALIZED = 1;
+}
+
+
+#define enum_class_PiObject  -1
+
+pmclass PiObject need_ext dynpmc {
+  
+  void init () {
+    PIRATE_initialize();
+    PMC_data(SELF) = Py_None;
+  }
+  
+  INTVAL get_integer () {
+    return 0;
+  }
+  
+  
+  STRING* get_string () {
+    return string_from_cstring(INTERP,
+			       PyString_AsString(PyObject_Str(PMC_data(SELF))),
+			       0);
+  } 
+  
+  void set_string_native (STRING* s) {
+    PMC_data(SELF) = PyString_FromString(string_to_cstring(INTERP, s));
+  }
+
+ 
+  void multiply_int (INTVAL value,  PMC* dest) {
+    // @TODO: shouldn't I have to allocate a new PiObject here?!
+    // ?? parrot_PiObject_class_init(INTERP, dest);
+    PMC_data(dest) = PySequence_Repeat((PyObject *) PMC_data(SELF), (int) value);
+  }
+  
+  
+  INTVAL type () {
+    return enum_class_PiObject;
+  }
+  
+}
+
