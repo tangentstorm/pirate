@@ -71,7 +71,7 @@ class PirateVisitor(object):
         self.globals = {}
         self.classStack = [] # the class we're looking at right now
         self.reachable = True
-        self.types = {}
+        #self.types = {}
         self.locals = {}
         self.seen_labels = []
         self.pending_unless = None
@@ -97,12 +97,13 @@ class PirateVisitor(object):
         return sym
 
     def find_type(self, type):
-        if type in self.types:
-            return self.types[type]
-        index = self.gensym("$I")
-        self.append("find_type %s, '%s'" % (index,type))
-        self.types[type] = index
-        return index
+        return "'%s'" % type
+        # if type in self.types:
+        #    return self.types[type]
+        #index = self.gensym("$I")
+        #self.append("find_type %s, '%s'" % (index,type))
+        #self.types[type] = index
+        #return index
 
     def getCode(self):
         res  = ".sub %s @MAIN\n" % self.name
@@ -136,7 +137,7 @@ class PirateVisitor(object):
         if optional and not name in self.seen_labels: return
         self.reachable = True
         self.append("%s:" % name, indent=False)
-        self.types = {}
+        #self.types = {}
         self.locals = {}
 
     def unless(self, expression, label):
@@ -146,6 +147,7 @@ class PirateVisitor(object):
         self.pending_unless = (expression, label)
 
     def goto(self, label):
+        if not self.reachable: return
         self.seen_labels.append(label)
         if self.pending_unless:
             cond = self.pending_unless[0]
@@ -658,7 +660,8 @@ class PirateVisitor(object):
         self.subs.append(pir)
 
         # store the address in dest
-        self.append("newsub %s, %s, %s" % (ref, self.find_type("PyFunc"), sub))
+        self.append("new %s, %s" % (ref, self.find_type("PyFunc")))
+        self.append("set_addr %s, %s" % (ref, sub))
         for (i, arg) in enumerate(node.argnames):
             self.append("%s[%s] = '%s'" % (ref, i, arg))
 
@@ -1276,8 +1279,6 @@ def compile(src, name="__main__"):
     vis.preorder(ast, pir)
     if name=="__main__":
         pre  = ["    loadlib P1, 'python_group'",
-                "    find_global P0, 'PyBuiltin', '__load__'",
-                "    invoke",
                 "    push_eh __py_catch"]
         post = ["    .return ()",
                 "__py_catch:",
