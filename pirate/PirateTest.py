@@ -20,6 +20,7 @@ class PirateTest(unittest.TestCase):
     def run(self, code, dump=0, lines=1):
         return pirate.invoke(trim(code), dump, lines=lines)
 
+    ## simple vars/expressions ###################
     
     def test_print(self):
         res = self.run(
@@ -29,34 +30,6 @@ class PirateTest(unittest.TestCase):
             """)
         self.assertEquals(res, "hello, world!\n")
 
-
-    def test_if(self):
-        res = self.run(
-            """
-            if 1:
-                print 'shiver me timbers!'
-            if 0:
-                print 'ahoy maties!'
-            else:
-                print 'yar har har!'
-            if 0:
-                print 'walk the plank!'
-            elif 1:
-                print 'avast, ye landlubbers!'
-            """, dump=0)
-        self.assertEquals(res,  "shiver me timbers!\n" \
-                                 + "yar har har!\n" \
-                                 + "avast, ye landlubbers!\n")
-        
-    def test_if_expr(self):
-        res = self.run(
-            """
-            n = 1
-            if n > 0:
-                print 'x'
-            """, dump=0)
-        self.assertEquals(res, "x\n")
-        
 
     def test_assignment(self):
         res = self.run(
@@ -86,6 +59,38 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "2\n2.000000\n")
 
 
+    def test_compare(self):
+        res = self.run(
+            """
+            #@TODO: print 1<2<3
+            print 1==1, 0!=0, 1>0, 1<=5,
+            print 1>=5, 4<>3,
+            """)
+        self.assertEquals(res, "1 0 1 1 0 1 ")
+
+    def test_logic(self):
+        res = self.run(
+            """
+            print 'cat' or 'mouse',
+            if not (1 and 0): print 'and',
+            print 'cat' and 'mouse',
+            """, dump=0)
+        self.assertEquals(res, "cat and mouse ")
+
+
+
+    ## pass ######################################
+        
+    def test_pass(self):
+        res = self.run(
+            """
+            pass
+            """, dump=0, lines=0)
+        self.assertEquals(res, "")
+
+
+    ## control structures ########################
+
     def test_while(self):
         res = self.run(
             """
@@ -97,18 +102,81 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "3 2 1 ")
 
 
-    def test_compare(self):
+    def test_if(self):
         res = self.run(
             """
-            #@TODO: print 1<2<3
-            print 1==1, 0!=0, 1>0, 1<=5,
-            print 1>=5, 4<>3,
-            """)
-        self.assertEquals(res, "1 0 1 1 0 1 ")
+            if 1:
+                print 'shiver me timbers!'
+            if 0:
+                print 'ahoy maties!'
+            else:
+                print 'yar har har!'
+            if 0:
+                print 'walk the plank!'
+            elif 1:
+                print 'avast, ye landlubbers!'
+            """, dump=0)
+        self.assertEquals(res,  "shiver me timbers!\n" \
+                                 + "yar har har!\n" \
+                                 + "avast, ye landlubbers!\n")
+        
+    def test_if_expr(self):
+        res = self.run(
+            """
+            n = 1
+            if n > 0:
+                print 'x'
+            """, dump=0)
+        self.assertEquals(res, "x\n")
 
+        
+    def test_for(self):
+        res = self.run(
+            """
+            for num in [1, 2, 3, 4, 5]:
+                print num * num,
+            print
+            """, dump=0)
+        self.assertEquals(res, "1 4 9 16 25 \n")
+
+
+    def test_break(self):
+        res = self.run(
+            """
+            for x in [1, 2]:
+                for y in [1,2,3,4,5]:
+                    if y >1: break
+                    print [x,y],
+            
+            num = 0
+            while 1:
+                num = num + 1
+                print num,
+                if num == 2: break
+            """)
+        self.assertEquals(res, "[1, 1] [2, 1] 1 2 ")
+
+
+    def test_continue(self):
+        res = self.run(
+            """
+            for num in [1, 2, 3, 4, 5]:
+                if num < 4: continue
+                print num,
+            
+            num = 0
+            while num<5:
+                num = num + 1
+                if num < 4: continue
+                print num,
+            """, dump=0)
+        self.assertEquals(res, "4 5 4 5 ")
+
+
+
+    ## amk's example program #####################
 
     def test_euclid(self):
-        # amk's example program:
         res = pirate.invoke(open("euclid.py").read(), dump=0)
         self.assertEquals(res, "96 64\n32\n")
 
@@ -130,76 +198,8 @@ class PirateTest(unittest.TestCase):
             """)
         self.assertEquals(res, "[1, 2, [3, 4], 5]\n")
         
-    
-    def test_for(self):
-        res = self.run(
-            """
-            for num in [1, 2, 3, 4, 5]:
-                print num * num,
-            print
-            """, dump=0)
-        self.assertEquals(res, "1 4 9 16 25 \n")
-
-    def test_break(self):
-        res = self.run(
-            """
-            for x in [1, 2]:
-                for y in [1,2,3,4,5]:
-                    if y >1: break
-                    print [x,y],
             
-            num = 0
-            while 1:
-                num = num + 1
-                print num,
-                if num == 2: break
-            """)
-        self.assertEquals(res, "[1, 1] [2, 1] 1 2 ")
-
-    def test_continue(self):
-        res = self.run(
-            """
-            for num in [1, 2, 3, 4, 5]:
-                if num < 4: continue
-                print num,
-            
-            num = 0
-            while num<5:
-                num = num + 1
-                if num < 4: continue
-                print num,
-            """, dump=0)
-        self.assertEquals(res, "4 5 4 5 ")
-
-
-    def test_logic(self):
-        res = self.run(
-            """
-            print 'cat' or 'mouse',
-            if not (1 and 0): print 'and',
-            print 'cat' and 'mouse',
-            """, dump=0)
-        self.assertEquals(res, "cat and mouse ")
-
-
-## @TODO: re=enable this with set-lex
-##     def test_function(self):
-##         res = self.run(
-##             """
-##             __py__print('function call!') # from pirate.imc!!
-##             """, dump=0)
-##         self.assertEquals(res, "function call!")
-
-        
-    def test_pass(self):
-        res = self.run(
-            """
-            pass
-            """, dump=0, lines=0)
-        self.assertEquals(res, "")
-
-
-    ## function-related stuff ##############################
+    ## function-related stuff ####################
 
     def test_minimal_function(self):
         res = self.run(
@@ -275,6 +275,18 @@ class PirateTest(unittest.TestCase):
             """, dump=0, lines=0)
         self.assertEquals(res, "1 0 ")
 
+
+    def test_no_return(self):
+        res = self.run(
+            """
+            def f(): pass
+            print f()
+            """, dump=0,lines=0)
+        self.assertEquals(res, "None\n")
+
+
+    ## scope tests ###############################
+        
     def test_lexical_scope(self):
         res = self.run(
             """
@@ -288,13 +300,6 @@ class PirateTest(unittest.TestCase):
             """, dump=0, lines=0)
         self.assertEquals(res, "15 1\n")
 
-    def test_no_return(self):
-        res = self.run(
-            """
-            def f(): pass
-            print f()
-            """, dump=0,lines=0)
-        self.assertEquals(res, "None\n")
 
     def test_global(self):
         res = self.run(
@@ -309,8 +314,7 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "dog\n")
 
 
-    ## list comprehensions #####################
-
+    ## list comprehensions #######################
 
     def test_listcomp(self):
         res = self.run(
@@ -318,6 +322,7 @@ class PirateTest(unittest.TestCase):
             print [x for x in ['c','a','t'] if x !='c']
             """, dump=0)
         self.assertEquals(res, "[a, t]\n") #@TODO: quote strings
+
 
     def test_listcomp(self):
         res = self.run(
@@ -328,7 +333,6 @@ class PirateTest(unittest.TestCase):
                         if x < 7]
             """, dump=0)
         self.assertEquals(res, "[15, 25, 16, 26]\n")
-            
 
 
 if __name__=="__main__":
