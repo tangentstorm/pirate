@@ -35,7 +35,8 @@ Many thanks to:
 
  Allen Short  ( dash on #python )
     For a massive patch covering variable binding 
-    and IMCC symbol declaration.
+    and IMCC symbol declaration, and for showing
+    me how to implement generators. :)
 
  David Chan ( http://sheetmusic.org.uk/ )
     For various bugfixes, augmented assignment,
