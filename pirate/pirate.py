@@ -398,7 +398,7 @@ class PirateVisitor(object):
         op = self.bitwiseOps[node.__class__]
         value = self.compileExpression(node.nodes[0], allocate=1)
         for n in node.nodes[1:]:
-            next = self.compileExpression(n)
+            next = self.compileExpression(n, allocate=-1)
             tmp = self.gensym()
             self.append("new %s, %s" % (tmp,self.find_type("PyObject")))
             self.append("%s = %s %s %s" % (tmp, value, op, next))
@@ -1043,10 +1043,11 @@ class PirateVisitor(object):
     def visitFunction(self, node):  # visitDef
         if self.classStack:
             fun = self.genFunction(node, node.name, allocate=0)
+            self.locals[node.name] = fun
             klass = self.classStack[-1]
             self.append("setprop %s, '%s', %s" % (klass, node.name, fun))
         else:
-            fun = self.genFunction(node, node.name, allocate=1)
+            self.genFunction(node, node.name, allocate=1)
             
 
     def visitReturn(self, node):
@@ -1228,7 +1229,7 @@ class PirateSubVisitor(PirateVisitor):
         label = self.genlabel("gen")
         self.append("newsub %s, .Coroutine, %s" % (gen,label))
         self.append("new %s, %s" % (result,self.find_type("PyGen")))
-        self.append("setref %s, %s" % (result,gen))
+        self.append("setprop %s, 'next', %s" % (result,gen))
 
         self.append(".return (%s)" % result)
         self.label(label)
