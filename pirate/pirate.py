@@ -436,8 +436,8 @@ class PirateVisitor(object):
         "==": "iseq",
         ">":  "isgt",
         ">=": "isge",
-        "is": "iseq",
-        "is not": "isne",
+        "is": "issame",
+        "is not": "isntsame",
     }
 
     def unlessExpression(self, test, label):
@@ -446,11 +446,9 @@ class PirateVisitor(object):
         if isinstance(test, ast.Compare):
 
             op, code = test.ops[0]
-            if op=="is": op="=="
-            if op=="is not": op="!="
             if op=="<>": op="!="
         
-            if op<>"in":
+            if op not in ("in","is","is not"):
                 symL = self.compileExpression(test.expr, allocate=1)
                 symR = self.compileExpression(code)
                 self.unless("%s %s %s" % (symL, op, symR), label)
@@ -926,7 +924,6 @@ class PirateVisitor(object):
         self.loops.append((_while, _endwhile))
         
         self.label(_while)
-        testvar = self.compileExpression(node.test)
         if node.else_:
             self.unlessExpression(node.test, _elsewhile)
             self.visit(node.body)
