@@ -235,17 +235,6 @@ class PirateVisitor(object):
 
 
 
-    def assertNotUndefined(self, what, error):
-        # @TODO: remove thess runtime checks once Pyobjects work
-        # parrotclass.getprop returns PyNone if not present so:
-        endCheck = self.genlabel("endCheck")
-        self.append("typeof $S0, %s" % what)
-        self.append("unless $S0 == 'PyNone' goto %s" % endCheck)
-        ex = ast.Raise(ast.Const(error), None, None)
-        self.visit(ex)
-        self.append("%s:" % endCheck)
-
-
     def expressSubscript(self, node, allocate):
         assert len(node.subs) == 1, "huh? multiple subscripts?" # huh?
         
@@ -262,7 +251,6 @@ class PirateVisitor(object):
             check = self.gensym("ck")
             self.append("%s = %s" % (check, slot))
             key = getattr(node.subs[0], "value", node.subs[0])
-            self.assertNotUndefined(check, "KeyError: " + str(key))
 
         if node.flags == "OP_DELETE":
             self.append("delete " + slot)
