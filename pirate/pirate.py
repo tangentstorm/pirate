@@ -67,19 +67,21 @@ class PirateVisitor:
         """
         create code to eval expression Node 'expr' and put it in 'dest'
         """
+        klass = expr.__class__
+        
         ## plain old variables
-        if isinstance(expr, compiler.ast.Name):
+        if klass==compiler.ast.Name:
             return ["%s = %s" % (dest, expr.name)]
 
         ## constants
-        elif isinstance(expr, compiler.ast.Const):
+        elif klass==compiler.ast.Const:
             t = type(expr.value)
             assert t in self.typeMap, "unsupported const type:%s" % t
             return [("%s = new %s" % (dest, self.typeMap[t])),
                     ("%s = %s" % (dest, repr(expr.value)))]
 
         ## lists
-        elif isinstance(expr, compiler.ast.List):
+        elif klass==compiler.ast.List:
             res = ["%s = new PerlArray" % dest]
             sym = self.symbol("$P")
             for item in expr.nodes:
@@ -88,27 +90,33 @@ class PirateVisitor:
             return res
         
         ## math expressions
-        elif isinstance(expr, tuple(self.infixOps.keys())):
+        elif klass in self.infixOps:
             return self.infixExpression(expr, dest)
 
         ## comparisons
-        elif isinstance(expr, compiler.ast.Compare):
+        elif klass==compiler.ast.Compare:
             return self.compareExpression(expr, dest)
 
         ## boolean logic
-        elif isinstance(expr, tuple(self.logicOps.keys())):
+        elif klass in self.logicOps:
             return self.logicExpression(expr, dest)
+
+        ## function call
+        elif klass==compiler.ast.CallFunc:
+            self.visitCallFunc(expr)
 
         ## stuff to do... :)
         else:
             print
             print
             print "*** UNKNOWN EXPRESSION ****"
+            print expr
             print "*** entering debugger ****"
             print
             print
             import pdb; pdb.set_trace()
-            
+
+
     infixOps = {
         compiler.ast.Add: "+",
         compiler.ast.Sub: "-",
@@ -196,6 +204,7 @@ class PirateVisitor:
             res.extend(self.expression(R, tmp))
             res.append("%s %s, %s, %s" % (operator, dest, dest, tmp))
         return res
+
 
     ##[ visitor methods ]##########################################
         
@@ -328,6 +337,15 @@ class PirateVisitor:
         assert self.loops, "continue outside of loop" # SyntaxError
         self.append("goto %s" % self.loops[-1][0])
 
+    def visitCallFunc(self, node):
+        assert not (node.star_args or node.dstar_args), "f(*x,**y) not working yet"
+        node.args.reverse()
+        for arg in node.args:
+            var = self.symbol("arg")
+            self.append(".local object %s" % var)
+            self.extend(self.expression(arg, var))
+            self.append(".arg %s" % var)
+        self.append('call %s' % node.node.name)
 
         
 ## module interface ###############################################

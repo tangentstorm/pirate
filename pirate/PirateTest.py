@@ -174,9 +174,16 @@ class PirateTest(unittest.TestCase):
             print 'cat' and 'mouse',
             """, dump=0)
         self.assertEquals(res, "cat and mouse ")
-        
-           
-                                                                    
+
+
+    def test_function(self):
+        res = run(
+            """
+            _pyprint('function call!') # from pirate.imc!!
+            """, dump=0)
+        self.assertEquals(res, "function call!")
+
+
 if __name__=="__main__":
     unittest.main()
     
