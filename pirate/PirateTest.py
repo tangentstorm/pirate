@@ -93,6 +93,15 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(result, "3 2 1 ")
 
 
+    def test_compare(self):
+        result = pirate.invoke(trim(
+            """
+            #@TODO: print 1<2<3
+            print 1==1, 0!=0, 1>0, 1<=5,
+            print 1>=5, 4<>3
+            """), dump=0)
+        self.assertEquals(result, "1 0 1 1 0 1\n")
+
 
 if __name__=="__main__":
     unittest.main()

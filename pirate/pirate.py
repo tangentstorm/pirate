@@ -49,17 +49,6 @@ class PirateVisitor:
 
     ##[ expression compiler ]######################################
 
-    infixOps = {
-        compiler.ast.Add: "+",
-        compiler.ast.Sub: "-",
-        compiler.ast.Mul: "*",
-        compiler.ast.Div: "/",
-        compiler.ast.Mod: "%",
-        #compiler.ast.Power: "**",        # doesn't work yet
-        #compiler.ast.RightShift: '>>',   # untested
-        #compiler.ast.LeftShift: '<<',    # untested
-    }
-
     logicOps = {
         compiler.ast.And: '&&',
         compiler.ast.Or: '||',
@@ -75,6 +64,8 @@ class PirateVisitor:
             return ["%s = %s" % (dest, repr(expr.value))]
         elif isinstance(expr, tuple(self.infixOps.keys())):
             return self.infixExpression(expr, dest)
+        elif isinstance(expr, compiler.ast.Compare):
+            return self.compareExpression(expr, dest)
         else:
             print
             print
@@ -84,6 +75,17 @@ class PirateVisitor:
             print
             import pdb; pdb.set_trace()
             
+    infixOps = {
+        compiler.ast.Add: "+",
+        compiler.ast.Sub: "-",
+        compiler.ast.Mul: "*",
+        compiler.ast.Div: "/",
+        compiler.ast.Mod: "%",
+        #compiler.ast.Power: "**",        # doesn't work yet
+        #compiler.ast.RightShift: '>>',   # untested
+        #compiler.ast.LeftShift: '<<',    # untested
+    }
+
         
     def infixExpression(self, expr, dest):
         operator = self.infixOps[expr.__class__]
@@ -110,7 +112,34 @@ class PirateVisitor:
         # typecasting or something...)
         res.append("%s = %s" % (dest, symexpr))
         return res
-    
+
+    def compareExpression(self, expr, dest):
+        assert len(expr.ops) == 1, "multi-compare not working yet"
+        res = []       
+        # get left side:
+        symL = self.symbol("$P")
+        res.append("%s = new PerlInt" % symL)
+        res.extend(self.expression(expr.expr, symL))
+
+        # get the op:
+        op, code = expr.ops[0]
+        if op=="<>": op="!="
+        
+        # get right side:
+        symR = self.symbol("$P")
+        res.append("%s = new PerlInt" % symR)
+        res.extend(self.expression(code, symR))
+
+        _cmp = self.symbol("_cmp")
+        _end = self.symbol("_end")
+        res.append("if %s %s %s goto %s" % (symL, op, symR, _cmp))
+        res.append("%s = 0" % dest)
+        res.append("goto %s" % _end)
+        res.append("%s:" % _cmp)
+        res.append("%s = 1" % dest)
+        res.append("%s:" % _end)
+        return res
+
     ##[ visitor methods ]##########################################
         
     def visitPrint(self, node):
@@ -183,6 +212,7 @@ class PirateVisitor:
         self.visit(node.body)
         self.append("goto %s" % _while)
         self.append("%s:" % _endwhile)
+
 
 ## module interface ###############################################
 
