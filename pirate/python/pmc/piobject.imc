@@ -1,7 +1,7 @@
 
 .sub __main__
 
-    loadlib P1, "pirate"
+    loadlib P1, "pisequence"
     find_type I1, "PiSequence"
     print I1
     print "\n"
