@@ -32,6 +32,11 @@ Many thanks to:
  Ole Martin Bjorndalen ( http://www.cs.uit.no/~olemb/ )
     for readlisp.py
 
+ Sean O'Rourke 
+    for explaining .Closure and new_pad semantics
 
-Whoever wrote the python compiler package :)
- 
+ Greg Stein, Bill Tutt, Jeremy Hylton, and Mark Hammond
+    for the python compiler package!
+
+ Guido van Rossum
+    for python of course! :)
