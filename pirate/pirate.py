@@ -442,6 +442,9 @@ class PirateVisitor(object):
         self.append(".pcc_begin_return")
         self.append(".return %s" % _res)
         self.append(".pcc_end_return")
+
+    def visitPass(self, node):
+        self.append("noop")
                 
 
 

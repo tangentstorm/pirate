@@ -203,7 +203,15 @@ class PirateTest(unittest.TestCase):
             print (lambda x: x*x)(5)
             """, dump=0, lines=0)
         self.assertEquals(res, "25\n")
-            
+
+
+    def test_pass(self):
+        res = self.run(
+            """
+            pass
+            """, dump=0, lines=0)
+        self.assertEquals(res, "")
+
 
         
 if __name__=="__main__":
