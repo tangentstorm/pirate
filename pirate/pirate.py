@@ -22,12 +22,14 @@ class imclist(list):
     generated the code and appends that information 
     as a comment.
     """
+    
     def append(self, line):
         if ':' not in line:
             line = "    %-30s"  %line
             if "#" not in line:
                 line = line + "# %s"  % self.find_linenumber()
         super(imclist, self).append(line)
+        
     def find_linenumber(self):
         """
         python black magic. :)
@@ -223,9 +225,7 @@ class PirateVisitor(object):
     def expressGetattr(self, node, dest, allocate):
         self.set_lineno(node)
         attr = node.attrname
-        obj = self.symbol("obj")
-        self.append(".local object %(obj)s" % locals())
-        self.append("%(dest)s = new PerlUndef" % locals())
+        obj = self.imcObject("obj")
         self.compileExpression(node.expr, obj, allocate=1)
         self.append("getprop %(dest)s, '%(attr)s', %(obj)s" % locals())
         return dest
@@ -340,29 +340,21 @@ class PirateVisitor(object):
         ast.RightShift: '>>',   # untested
         ast.LeftShift: '<<',    # untested
     }
-
         
     def infixExpression(self, node, dest, allocate):
-        operator = self.infixOps[node.__class__]
-        symleft  = self.symbol("$P")
-        symright = self.symbol("$P")
-        symexpr  = self.symbol("$P")
+        lside = self.imcObject("lside")
+        rside = self.imcObject("rside")
+        self.compileExpression(node.left, lside)
+        self.compileExpression(node.right, rside)
 
-        # store left side of expression in symleft:
-        self.compileExpression(node.left, symleft)
+        op = self.infixOps[node.__class__]
+        result = self.imcObject("result")
+        self.append("%(result)s = %(lside)s %(op)s %(rside)s" % locals())
 
-        # store right side of expression in symright:
-        self.compileExpression(node.right, symright)
-
-        # store the combined value in symexpr
-        self.append("%s = new PerlUndef" % symexpr) #, typexpr))
-        self.append("%s = %s %s %s" \
-                    % (symexpr, symleft, operator, symright))
-
-        # and finally put the result in our destination
-        # (imcc seems to like this as a separate step for
-        # typecasting or something...)
-        self.append("%s = %s" % (dest, symexpr))
+        # put the result in our destination
+        # (imcc seems to like this as a separate step
+        # for typecasting or something...)
+        self.append("%(dest)s = %(result)s" % locals())
     
 
     def compareExpression(self, expr, dest, allocate):
@@ -577,10 +569,10 @@ class PirateVisitor(object):
             # if not true, goto _elif
             self.set_lineno(test)
             _elif = self.symbol("elif")
-            testvar = self.symbol("test")
 
-            self.append(".local object %(testvar)s" % locals())
-            self.append("%(testvar)s = new PerlInt" % locals())
+            testvar = self.imcObject("test")
+
+
             self.compileExpression(test, testvar)
             self.append("unless %(testvar)s goto %(_elif)s" % locals())
             
