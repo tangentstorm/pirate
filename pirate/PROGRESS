@@ -86,7 +86,7 @@ n visitAugGetattr(self, node, mode):
 
 
 ## o-o stuff #############
-n visitClass:
+n visitClass:     # partially done, but no pythonobjects, so...
 n visitAssAttr:
 n visitGetattr:
 
