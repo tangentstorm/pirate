@@ -12,15 +12,19 @@ INSTALLATION
 
 ############
 
-   Install parrot and python.
+   Install parrot and python. Pirate will currently 
+   run with python 2.2, but will soon require a python 
+   shared library (which probably means 2.3 or above)
 
-   As of Jan 10, 2004, you'll need a patched version of
-   parrot. The patch is Luke Palmer's code to make parrot
-   continuations close over register stacks. This patch may 
-   be part of the main parrot source tree by the time you
-   read this, but if not, there's a copy in LUKEPATCH.
+   You can compile python 2.3 or above to work as a
+   shared library with:
 
-   Once you've got a decent parrot, run the tests:
+        ./configure --enable-share
+        make
+   
+
+   Once you've got a decent parrot and a decent python, 
+   run the tests:
 
 
 #################
