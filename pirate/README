@@ -50,12 +50,21 @@ to work with the new intermediate code compiler
     - anything on the above list
     - __builtin__ routines
     - standard library (hopefully w/help from pypython?)
+    - optimization of generated code
+
     - run C modules from parrot's native call interface 
       PMCs are sead to be very similar to PyObjects. 
       It would be awesome if things like Numeric, 
       pygame, etc could "just work" somehow... :)
-    - optimization of generated code
 
+      Jack Jansen of MacPython fame says:
+      """
+      ... bidirectional bridging of Python objects to a 
+      similar object architecture is definitely doable. 
+      Look at PyObjC <http://pyobjc.sf.net> for a project
+      that does a pretty complete bridge between Python 
+      and Objective-C.
+      """
 
 
 ## cvs access ####################################
@@ -106,4 +115,5 @@ dump=0 and lines=1. Set dump to 1 to show the
 generated code for a test, set lines to 0 to hide
 the line numbers (in case you want to pipe it
 to an *.imc file to play around with manually).
+
 
