@@ -137,10 +137,15 @@ class PirateVisitor(object):
 
     def lookupName(self, name):
         if name in self.locals:
-            return self.locals[name]
-        dest = self.gensym()
-        self.append("find_lex %s, '%s'" % (dest, name))
-        self.locals[name] = dest
+            dest = self.locals[name]
+            if not dest.startswith('$'):
+                dest = self.gensym()
+                self.append("%s = %s" % (dest, self.locals[name]))
+                self.locals[name] = dest
+        else:
+            dest = self.gensym()
+            self.append("find_lex %s, '%s'" % (dest, name))
+            self.locals[name] = dest
         return dest
     ##[ expression compiler ]######################################
     
@@ -263,11 +268,8 @@ class PirateVisitor(object):
         dest = self.gensym()
         self.append("new %s, %s" % (dest,self.find_type("PyDict")))
         if node.items:
-            key = self.gensym()
             for k,v in node.items:
-                tmp = self.compileExpression(k)
-                self.append("%s = new Key"  % key)
-                self.append("%s = %s" % (key, tmp))
+                key = self.compileExpression(k)
                 val = self.compileExpression(v, allocate=1)
                 self.append("%s[%s] = %s" % (dest, key, val))
         return dest
@@ -1107,8 +1109,8 @@ class PirateSubVisitor(PirateVisitor):
         self.doc = doc
         self.args = args
         # self.locals = vars
-        # for (i,arg) in enumerate(self.args):
-        #     self.locals[arg] = "P%d" % (i+5)
+        for (i,arg) in enumerate(self.args):
+            self.locals[arg] = "P%d" % (i+5)
         self.counter = counter
         self.depth = depth
         self.globals = []
@@ -1124,6 +1126,7 @@ class PirateSubVisitor(PirateVisitor):
     def getCodeForFunction(self):
         code = self.lines
         self.lines = imclist()
+        fallthrou = self.reachable
         self.reachable = True
         if self.doc:
             self.append("")
@@ -1135,7 +1138,7 @@ class PirateSubVisitor(PirateVisitor):
             self.append(self.bindLocal(arg, "P%d" % (i+5)))
         self.lines.extend(code)
 
-        if self.reachable:
+        if fallthrou:
             none = self.gensym()
             type = self.gensym("$I")
             self.append('find_type %s, "PyNone"' % type)
