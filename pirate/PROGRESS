@@ -35,7 +35,8 @@ y visitDict:     # string keys only (because of PerlHash)
 y visitSubscript:
 y visitRaise:    # single argument only
 y visitAssert:
-y visitTryExcept:# single handler, no storing the object, no else
+y visitTryExcept:  # single handler, no storing the object, no else
+y visitTryFinally: # also, exception handlers persist (clear_eh op dumps core)
 
 
 # e just means it was done in the expression() method
@@ -71,10 +72,6 @@ n visitUnaryInvert:
 n visitUnarySub:
 n visitFloorDiv:
 n visitInvert:
-
-
-## exceptions ############
-n visitTryFinally:
 
 
 ## keyword arguments #####

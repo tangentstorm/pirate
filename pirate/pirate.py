@@ -693,6 +693,7 @@ class PirateVisitor(object):
 
 
     def visitTryExcept(self, node):
+        self.set_lineno(node)
         assert len(node.handlers)==1, "only one handler for now" #@TODO
         assert not node.else_, "try...else not implemented" #@TODO
         catch = self.symbol("catch")
@@ -710,7 +711,21 @@ class PirateVisitor(object):
             assert not (expr or target), "can't get exception object yet" #@TODO
             self.visit(body)
         self.append("%(endtry)s:" % locals())
+        #self.append("clear_eh") #@TODO: this, but it triggers a coredump :)
                 
+        
+    def visitTryFinally(self, node):
+        self.set_lineno(node)
+        final = self.symbol("final")
+        handler = self.symbol("final")
+        self.append(".local Sub %(handler)s" % locals())
+        self.append("newsub %(handler)s, .Exception_Handler, %(final)s" \
+                    % locals())
+        self.append("set_eh %(handler)s" % locals())
+        self.visit(node.body)
+        self.append("%(final)s:" % locals())
+        #self.append("clear_eh") #@TODO
+        self.visit(node.final) 
         
 
 

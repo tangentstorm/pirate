@@ -348,7 +348,7 @@ class PirateTest(unittest.TestCase):
 
 
     ## exceptions ################################
-    # @TODO: top-level pythonic exception handler
+    ## @TODO: top-level pythonic exception handler
     
     def test_raise(self):
         res = self.run(
@@ -380,6 +380,25 @@ class PirateTest(unittest.TestCase):
                 print 'caught it!'
             """, dump=0)
         self.assertEquals(res, "parrot caught it!\n")
+
+    def test_try_finally(self):
+        res = self.run(
+            """
+            try:
+                print '1',
+                raise 'hell'
+                print '2',
+            finally:
+                print '3',
+
+            try:
+                print '4',
+            finally:
+                print '5',
+            """, dump=0)
+        self.assertEquals(res, "1 3 4 5 ")
+
+    
 
 
 if __name__=="__main__":
