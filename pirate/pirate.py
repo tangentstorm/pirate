@@ -954,6 +954,7 @@ class PirateSubVisitor(PirateVisitor):
         for arg in self.args:
             res.append("    store_lex -1, '%(arg)s', %(arg)s" % locals())
         res.extend(self.lines)
+        res.append("    #------")
         res.append("    .local object None")
         res.append("    None = new PerlString")  #@TODO: .PythonNone
         res.append("    None = 'None'")
@@ -961,6 +962,7 @@ class PirateSubVisitor(PirateVisitor):
         res.append("    .return None")
         res.append("    .pcc_end_return")
         res.append(".end")
+        res.append("")
         return "\n".join(res)
 
     def getCodeForGenerator(self):
@@ -1004,12 +1006,12 @@ class PirateSubVisitor(PirateVisitor):
         self.isGenerator = 1
         res = self.imcObject("res")
         self.compileExpression(node.value, res)
-        self.append("saveall")
-        self.append("pop_pad")
+        #self.append("saveall")
+        #self.append("pop_pad")
         self.append(".pcc_begin_yield")
         self.append(".return %(res)s" % locals())
         self.append(".pcc_end_yield")
-        self.append("restoreall")
+        #self.append("restoreall")
         
         
                 

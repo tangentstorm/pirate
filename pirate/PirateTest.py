@@ -592,7 +592,27 @@ class PirateTest(unittest.TestCase):
             """, dump=0, lines=0)            
         self.assertEquals(res, "0 1 ") #done\n")
 
-
+    def test_microthreads(self):
+        res = self.run(            
+            """
+            from __future__ import generators #@TODO: 2.3
+            def make_count(step):
+                def count():
+                    x = 0
+                    while 1:                        
+                        yield step
+                        print x
+                        print step + x
+                        #print x+ step
+                        #x = x + step
+                        #x = x + step
+                return count()
+            gs = [make_count(0), make_count(1)]
+            for g in gs:
+                print g.next(),
+            """, dump=1, lines=0)
+        self.assertEquals(res, "0 0 0 1 0 2 0 3")
+            
 ## @TODO: implement iterators (for x in g)
 ## waiting on *.next() for all objects.
 ## otherwise, we have to write special case code
