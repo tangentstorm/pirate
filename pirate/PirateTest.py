@@ -45,12 +45,15 @@ class PirateTest(unittest.TestCase):
     def testIf(self):
         result = pirate.invoke(trim(
             """
+            if 1:
+                print 'shiver me timbers!'
+                
             if 0:
                 print 'ahoy maties!'
             else:
                 print 'yar har har!'
             """), dump=0)
-        self.assertEquals(result, "yar har har!\n")
+        self.assertEquals(result, "shiver me timbers!\nyar har har!\n")
 
 
 if __name__=="__main__":

@@ -77,6 +77,7 @@ class PirateVisitor:
         # _else:
         self.append("%s:" % _else)
         if node.else_:
+            self.extend(self.set_lineno(node.else_))
             self.visit(node.else_)
             
         # _endif:
