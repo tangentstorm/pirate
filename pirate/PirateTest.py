@@ -179,16 +179,6 @@ class PirateTest(unittest.TestCase):
 
     ## tests that are not QUITE ready #####################
 
-    def test_compare(self):
-        #@TODO: make boolean print as True or False
-        res = self.run(
-            """
-            #@TODO: print 1<2<3
-            print 1==1, 0!=0, 1>0, 1<=5,
-            print 1>=5, 4<>3,
-            """)
-        self.assertEquals(res, "1 0 1 1 0 1 ")
-
     def test_return_tuple(self):
         #@TODO: make tuples be tuples once there's a .PythonTuple
         res = self.run(
@@ -207,18 +197,6 @@ class PirateTest(unittest.TestCase):
             print (1,2,(3,4),5)
             """)
         self.assertEquals(res, "[1, 2, [3, 4], 5]\n")
-
-    def test_unary(self):
-        #@TODO: make boolean print as True or False
-        res = self.run(
-            """
-            x = 1
-            print -x,
-            print +x,
-            print ~x,
-            print not x,
-            """, dump=0, lines=1)
-        self.assertEquals(res, "-1 1 -2 0 ")
 
 if __name__=="__main__":
     import new

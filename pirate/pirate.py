@@ -365,7 +365,7 @@ class PirateVisitor(object):
 
     def compareExpression(self, expr, allocate):
         assert len(expr.ops) == 1, "@TODO: multi-compare not working yet"
-        dest = self.gensym("compare")
+        dest = self.gensym("compare", "Boolean")
         # get left side:
         symL = self.compileExpression(expr.expr, allocate=1)
 
@@ -378,7 +378,7 @@ class PirateVisitor(object):
 
         _cmp = self.genlabel("cmp")
         _end = self.genlabel("endcmp")
-        self.append("%s = new PerlInt" % dest)
+        self.append("%s = new Boolean" % dest)
         self.append("if %s %s %s goto %s" % (symL, op, symR, _cmp))
         self.append("%s = 0" % dest)
         self.append("goto %s" % _end)
@@ -397,12 +397,16 @@ class PirateVisitor(object):
     def logicExpression(self, expr, allocate):
         operator = self.logicOps[expr.__class__]
         if operator == "!":            
-            dest = self.compileExpression(expr.expr, allocate=1)
-            self.append("not %s, %s" % (dest,dest))
+            dest = self.genlabel("tmp")
+            tmp = self.compileExpression(expr.expr, allocate=1)
+            self.append(".local Boolean %s" % dest)
+            self.append("%s = new Boolean" % dest)
+            self.append("not %s, %s" % (dest,tmp))
         else:
             L,R = expr.nodes
             tmp = self.genlabel("tmp")
-            self.append(".local PerlInt %s" % tmp)
+            self.append(".local Boolean %s" % tmp)
+            self.append("%s = new Boolean" % tmp)
             dest = self.compileExpression(L, allocate=1)
             tmp = self.compileExpression(R, allocate=1) # until we come up with an unboxing scheme
             self.append("%s %s, %s, %s" % (operator, dest, dest, tmp))
