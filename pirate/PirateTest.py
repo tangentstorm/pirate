@@ -52,8 +52,17 @@ class PirateTest(unittest.TestCase):
                 print 'ahoy maties!'
             else:
                 print 'yar har har!'
+
+            if 0:
+                print 'walk the plank!'
+            elif 1:
+                print 'avast, ye landlubbers!'
             """), dump=0)
-        self.assertEquals(result, "shiver me timbers!\nyar har har!\n")
+        self.assertEquals(result,  "shiver me timbers!\n" \
+                                 + "yar har har!\n" \
+                                 + "avast, ye landlubbers!\n")
+
+       
 
 
 if __name__=="__main__":

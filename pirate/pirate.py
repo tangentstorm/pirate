@@ -61,21 +61,23 @@ class PirateVisitor:
 
 
     def visitIf(self, node):
-        assert len(node.tests) == 1, "Only one test supported"
-        _else = self.symbol("_else")
+        #assert len(node.tests) == 1, "Only one test supported"
         _endif = self.symbol("_endif")
-        testExpr, body = node.tests[0]
-        self.extend(self.set_lineno(testExpr))
-        
-        # if not true, goto _else
-        self.append("unless %s goto %s" % (testExpr.value, _else))
 
-        # do it ; goto _endif
-        self.visit(body)
-        self.append("goto %s" % _endif)
+        for test, body in node.tests:
+
+            # if not true, goto _elif
+            self.extend(self.set_lineno(test))
+            _elif = self.symbol("_elif")
+            self.append("unless %s goto %s" % (test.value, _elif))
+            
+            # do it and goto _endif
+            self.visit(body)
+            self.append("goto %s" % _elif)
+            
+            # _elif: (next test or pass through to else)
+            self.append("%s:" % _elif)
         
-        # _else:
-        self.append("%s:" % _else)
         if node.else_:
             self.extend(self.set_lineno(node.else_))
             self.visit(node.else_)
