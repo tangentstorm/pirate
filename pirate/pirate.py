@@ -6,6 +6,14 @@ loosely based on parrot-gen.py by amk:
 http://www.amk.ca/conceit/parrot.html
 
 """
+__doc__=\
+"""
+pirate: python to parrot compiler 
+
+usage:  pirate.py [-d] filename.py
+        -d dumps the generated parrot code
+"""
+
 import os
 import compiler
 
@@ -243,8 +251,40 @@ class PirateVisitor:
         self.append("%s:" % _endwhile)
 
 
-## module interface ###############################################
+    def visitFor(self, node):
+        assert node.else_ is None, "for...else not supported"
+        assert not isinstance(node.assign, compiler.ast.AssTuple), \
+               "for x,y not implemented yet"
 
+        self.extend(self.set_lineno(node))
+        self.append(".local object %s" % node.assign.name)
+        forloop = self.symbol("_for")
+        loopidx = self.symbol("idx")
+        forlist = self.symbol("list")
+        listlen = self.symbol("$I")
+
+        # first get the list
+        self.append(".local PerlArray %s" % forlist)
+        self.extend(self.expression(node.list, forlist))
+
+        # forlist = len(list)
+        self.append("%s = %s" % (listlen, forlist))
+
+        # int counter = 0
+        self.append(".local int %s" % loopidx)        
+        self.append("%s = 0" % loopidx)
+
+        # do the loop body
+        self.append("%s:" % forloop)
+        self.append("%s = %s[%s]" % (node.assign.name, forlist, loopidx))
+        self.visit(node.body)
+
+        # then increment the index and loop
+        self.append("%s = %s + 1" % (loopidx, loopidx))
+        self.append("if %s < %s goto %s" % (loopidx, listlen, forloop))
+
+        
+## module interface ###############################################
 
 def compile(src):
     ast = compiler.parse(src)
@@ -253,15 +293,29 @@ def compile(src):
     vis.preorder(ast, pir)
     pir.append("end")
     res = ".sub __main__\n" + ("\n".join(pir.lines)) + "\n.end\n"
-    return res + ( open("pirate.imc").read() )
+    return res 
     
 
 def invoke(src, dump=0):
     i,o = os.popen4("imcc -")
     code = compile(src)
     if dump:
+        print
         print code
     print >> i, code
+    print >> i, open("pirate.imc").read()
     i.close()    
     return o.read()
+
+if __name__=="__main__":
+    import sys
+    if len(sys.argv) > 1:
+        src = open(sys.argv[-1]).read()
+        if "-d" in sys.argv:
+            print compile(src)
+        else:
+            print invoke(src)
+    else:
+        print __doc__
+        sys.exit()
 

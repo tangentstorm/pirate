@@ -114,12 +114,18 @@ class PirateTest(unittest.TestCase):
     def test_list(self):
         res = run(
             """
-            print [], [1], [1,2,3]
+            print [], [1], [1,2,3], [[],[4],[]]
             """)
-        self.assertEquals(res, "[] [1] [1, 2, 3]\n")
+        self.assertEquals(res, "[] [1] [1, 2, 3] [[], [4], []]\n")
     
     def test_for(self):
-        pass
+        res = run(
+            """
+            for num in [1, 2, 3, 4, 5]:
+                print num * num,
+            print
+            """, dump=0)
+        self.assertEquals(res, "1 4 9 16 25 \n")
            
                                                                     
 if __name__=="__main__":
