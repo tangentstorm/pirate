@@ -220,7 +220,8 @@ class PirateVisitor(object):
     constMap = {
         str: "PyString",
         int: "PyInt",
-        float: "PyFloat"
+        float: "PyFloat",
+        complex: "Complex"
     }
 
 
@@ -232,6 +233,7 @@ class PirateVisitor(object):
             r = r.replace('"','\\"')
             r = '"' + r[1:-1] + '"'
             r = r.replace("\\'","'")
+        if isinstance(node.value,complex): r = '"' + r + '"'
         if allocate>0 or (allocate==-1 and r.startswith('"')):
             dest = self.gensym()
             self.append("new %s, %s" % (dest,self.find_type(self.constMap[t])))
@@ -329,7 +331,7 @@ class PirateVisitor(object):
 
     def expressUnary(self, node, allocate):
         dest = self.gensym()
-        value = self.compileExpression(node.expr)
+        value = self.compileExpression(node.expr, allocate=-1)
         op = self.unaryOps[node.__class__]
         self.append("new %s, %s" % (dest,self.find_type("PyObject")))
         self.append("%s = %s%s" % (dest, op, value))
