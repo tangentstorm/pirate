@@ -133,7 +133,7 @@ class PirateVisitor(object):
         if self.pending_unless:
             if self.pending_unless[1]!=name:
                 self.seen_labels.append(self.pending_unless[1])
-                self.append("unless %s goto %s" % self.pending_unless)
+                self.lines.append("unless %s goto %s" % self.pending_unless)
             self.pending_unless = None
         if optional and not name in self.seen_labels: return
         self.reachable = True
@@ -461,6 +461,21 @@ class PirateVisitor(object):
             if not test.value: 
                 self.goto(label)
 
+        elif isinstance(test, ast.And):
+            for node in test.nodes:
+                self.unlessExpression(node, label)
+
+        elif isinstance(test, ast.Or):
+            # this looks convoluted but optimizes down nicely
+            thenlabel = self.genlabel("then")
+            for node in test.nodes[:-1]:
+                orlabel = self.genlabel("or")
+                self.unlessExpression(node, orlabel)
+                self.goto(thenlabel)
+                self.label(orlabel, optional=True)
+            self.unlessExpression(test.nodes[-1], label)
+            self.label(thenlabel, optional=True)
+
         else:
             testvar = self.compileExpression(test)
             self.unless(testvar, label)
@@ -509,9 +524,18 @@ class PirateVisitor(object):
             self.append("not %s, %s" % (dest,tmp))
         else:
             dest = self.compileExpression(expr.nodes[0], allocate=1)
+            label = self.genlabel("shortcircuit")
             for right in expr.nodes[1:]:
+                if operator=='and':
+                    self.unless(dest, label)
+                else:
+                    orlabel = self.genlabel("or")
+                    self.unless(dest, orlabel)
+                    self.goto(label)
+                    self.label(orlabel)
                 tmp = self.compileExpression(right, allocate=1)
-                self.append("%s %s, %s, %s" % (operator, dest, dest, tmp))
+                self.append("%s = %s" % (dest, tmp))
+            self.label(label)
         return dest
 
     def expressSlice(self, lower, upper):
@@ -608,8 +632,8 @@ class PirateVisitor(object):
                 self.append("getattribute %s, %s, '%s'" % args)
                 sub = tmp
 
+            args = [sub,argx,keyx]
             sub = sub + ".__call__"
-            args = [argx,keyx]
 
         if allocate>-2:
             dest = self.gensym()
@@ -1105,6 +1129,7 @@ class PirateVisitor(object):
         self.label(catch)
         for hand in node.handlers:
             expr, target, body = hand
+            prev_exception = self.exception
             self.exception = self.gensym()
             self.append("%s = P5" % self.exception)
             if expr:
@@ -1117,7 +1142,7 @@ class PirateVisitor(object):
                 else:
                     self.append(expr)
             self.visit(body)
-            self.exception = None
+            self.exception = prev_exception
         self.label(endtry, optional=True)
 
                 
@@ -1126,14 +1151,26 @@ class PirateVisitor(object):
         # how do try/finally and continuations interact?
         # this is a hard question and should be brought up on the parrot list
         self.set_lineno(node)
+        eh = self.genlabel("except")
         final = self.genlabel("final")
+        endtry = self.genlabel("endtry")
         handler = self.gensym()
-        self.append("newsub %s, .Exception_Handler, %s" % (handler, final))
+        self.append("newsub %s, .Exception_Handler, %s" % (handler, eh))
         self.append("set_eh " + handler)
         self.visit(node.body)
         self.append("clear_eh")
+        prev_exception = self.exception
+        self.exception = self.gensym()
+        self.append("new %s, 'PyNone'" % self.exception)
+        self.goto(final)
+        self.label(eh)
+        self.append("%s = P5" % self.exception)
         self.label(final)
         self.visit(node.final) 
+        self.unless(self.exception, endtry)
+        self.append("rethrow %s" % self.exception)
+        self.label(endtry)
+        self.exception=prev_exception
 
 
     def visitClass(self, node):
