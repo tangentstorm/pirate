@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 #+----------------------------------------------------------------------+
 #| Zend Engine                                                          |
 #+----------------------------------------------------------------------+
@@ -16,6 +17,10 @@
 #+----------------------------------------------------------------------+
 # $Id$
 # $Log$
+# Revision 1.2  2003/08/14 09:46:23  sthorne
+# Added 'parrakeet' which is a parser that does (very very very) simple
+# s-expressions, just to spike a php parser.
+#
 # Revision 1.1  2003/08/13 04:13:07  sthorne
 # Checking in the php grammar (php.g) and the php compiler stuff.
 # Renamed php-tree to something thats a valid module name.
@@ -510,7 +515,7 @@ def d_for_expr(t):
 
 def d_expr_without_variable(t):
     """
-expr_without_variable:  
+expr_without_variable:
         list_assignment_expr
     |   new_expr
     |   assignment_expr
@@ -553,28 +558,27 @@ def d_op_expr(t):
 infix_op_expr:
        expr op expr
     """
-    print t
     return InfixOpExpr(t[0], t[1][0], t[2])
 
 def d_op(t):
     """
 op:
-        '||' $binary_op_left 1
-    |   '&&' $binary_op_left 2
-    |   'or' $binary_op_left 3
-    |   'and' $binary_op_left 4
-    |   'xor' $binary_op_left 5
-    |   '|' $binary_op_left 6
-    |   '&' $binary_op_left 7
-    |   '^' $binary_op_left 8
-    |   '.' $binary_op_left 9
-    |   '+' $binary_op_left 10
-    |   '-' $binary_op_left 11
-    |   '*' $binary_op_left 12
-    |   '/' $binary_op_left 13
-    |   '%' $binary_op_left 14
-    |   '<<' $binary_op_left 15
-    |   '>>' $binary_op_left 16
+        '||'
+    |   '&&'
+    |   'or'
+    |   'and'
+    |   'xor'
+    |   '|'
+    |   '&'
+    |   '^'
+    |   '.'
+    |   '+'
+    |   '-'
+    |   '*'
+    |   '/'
+    |   '%'
+    |   '<<'
+    |   '>>'
     """
     return t[0]
     
@@ -947,6 +951,13 @@ def d_class_constant(t):
 def d_is_reference(t):
     """ is_reference: '&'? """
     return t
+
+def d_static_or_variable_string(t):
+    """
+static_or_variable_string:
+        identifier 
+    |   T_VARIABLE
+    """
 
 def d_T_VARIABLE(t):
     """ T_VARIABLE: '$' identifier """

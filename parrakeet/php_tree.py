@@ -26,7 +26,7 @@ class StatementList:
         return '<StatementList len:%d contents:\n%r>' % (len(self.statement_list), self.statement_list)
 
     def emit(self):
-        return '\n'.join([x.emit() for x in self.statement_list])
+        return ''.join(['\t' + x.emit() + '\n' for x in self.statement_list])
 
 class WhileStatement:
     def __init__(self, expr, statement):
@@ -157,11 +157,15 @@ class ReturnStatement:
         return '<Return %r>' % self.expr
 
 class EchoStatement:
-    def __init__(self, expr):
-        self.expr = expr
+    def __init__(self, expr_list):
+        self.print_list = [PrintExpr(e) for e in expr_list]
 
     def __repr__(self):
-        return '<Echo %r>' % self.expr
+        return '<Echo %r>' % self.print_list
+
+    def emit(self):
+        return [p.emit() for p in self.print_list]
+        
 
 class PrintExpr:
     def __init__(self, expr):
