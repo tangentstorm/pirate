@@ -569,6 +569,7 @@ class PirateVisitor(object):
             sub = self.lambdaExpression(node.node, allocate=0)
         elif isinstance(node.node, ast.Getattr):
             obj = self.compileExpression(node.node.expr, allocate=1)
+            args.insert(0, obj)
             sub = "%s.%s" % (obj,node.node.attrname)
         else:
             sub = self.compileExpression(node.node, allocate=1)
@@ -615,10 +616,10 @@ class PirateVisitor(object):
 
 
     def lambdaExpression(self, node, allocate=0):
-        return self.genFunction(node, None, method=False, allocate=0)
+        return self.genFunction(node, None, allocate=0)
 
 
-    def genFunction(self, node,  name, method=False, allocate=1):
+    def genFunction(self, node,  name, allocate=1):
         self.set_lineno(node)
 
         # functions are always anonymous, so make fake names
@@ -638,7 +639,6 @@ class PirateVisitor(object):
         pir = PirateSubVisitor(sub,
                                depth = self.depth+1,
                                doc=comment,
-                               method = method,
                                args=node.argnames)
 
         # lambda is really just a single return function:
@@ -651,7 +651,6 @@ class PirateVisitor(object):
                 pir = PirateSubVisitor(sub,
                                depth = self.depth+1,
                                doc=comment,
-                               method = method,
                                args=node.argnames)
                 pir.locals={}
                 vis = compiler.visitor.ASTVisitor()
@@ -1025,11 +1024,11 @@ class PirateVisitor(object):
 
     def visitFunction(self, node):  # visitDef
         if self.classStack:
-            fun = self.genFunction(node, node.name, method=True, allocate=0)
+            fun = self.genFunction(node, node.name, allocate=0)
             klass = self.classStack[-1]
             self.append("setprop %s, '%s', %s" % (klass, node.name, fun))
         else:
-            fun = self.genFunction(node, node.name, method=False, allocate=1)
+            fun = self.genFunction(node, node.name, allocate=1)
             
 
     def visitReturn(self, node):
@@ -1084,7 +1083,10 @@ class PirateVisitor(object):
         for hand in node.handlers:
             expr, target, body = hand
             if expr:
-                expr = self.compileExpression(expr) + ".__match__(P5)"
+                expr = self.compileExpression(expr)
+                tmp = self.gensym()
+                self.append("%s = P5" % tmp)
+                expr = "%s.__match__(%s, %s)" % (expr, expr, tmp)
                 if target:
                     tmp = self.gensym()
                     self.append("%s = %s" % (tmp,expr))
@@ -1135,18 +1137,12 @@ class PirateSubVisitor(PirateVisitor):
     work on subroutines instead of whole
     programs.
     """
-    def __init__(self, name, depth, doc, method, args=[]):
+    def __init__(self, name, depth, doc, args=[]):
         super(PirateSubVisitor, self).__init__(name)
         self.doc = doc
         self.args = args
-        self.method = method
-        if self.method and self.args:
-            self.locals[self.args[0]] = "self"
-            for (i,arg) in enumerate(self.args[1:]):
-                self.locals[arg] = "P%d" % (i+5)
-        else:
-            for (i,arg) in enumerate(self.args):
-                self.locals[arg] = "P%d" % (i+5)
+        for (i,arg) in enumerate(self.args):
+            self.locals[arg] = "P%d" % (i+5)
         self.depth = depth
         self.globals = []
         self.isGenerator = 0
@@ -1169,17 +1165,10 @@ class PirateSubVisitor(PirateVisitor):
             self.append("")
             self.append("# %s" % self.doc, indent=False)
         
-        if self.method and self.args:
-            self.append(".sub %s @ANON,method" % self.name, indent=False)
-            self.append(self.bindLocal(self.args[0], 'self'))
-            self.append("new_pad %s" % self.depth) #@TODO: use -1 here??
-            for (i,arg) in enumerate(self.args[1:]):
-                self.append(self.bindLocal(arg, "P%d" % (i+5)))
-        else:
-            self.append(".sub %s @ANON" % self.name, indent=False)
-            self.append("new_pad %s" % self.depth) #@TODO: use -1 here??
-            for (i,arg) in enumerate(self.args):
-                self.append(self.bindLocal(arg, "P%d" % (i+5)))
+        self.append(".sub %s @ANON" % self.name, indent=False)
+        self.append("new_pad %s" % self.depth) #@TODO: use -1 here??
+        for (i,arg) in enumerate(self.args):
+            self.append(self.bindLocal(arg, "P%d" % (i+5)))
 
         self.lines.extend(code)
 
@@ -1209,15 +1198,9 @@ class PirateSubVisitor(PirateVisitor):
             self.append("")
             self.append("# %s" % self.doc, indent=False)
 
-        if self.method and self.args:
-            self.append(".sub \"%s\" @ANON,method" % name, indent=False)
-            self.append(self.bindLocal(self.args[0], 'self'))
-            for (i,arg) in enumerate(self.args[1:]):
-                self.append(self.bindLocal(arg, "P%d" % (i+5)))
-        else:
-            self.append(".sub \"%s\" @ANON" % name, indent=False)
-            for (i,arg) in enumerate(self.args):
-                self.append(self.bindLocal(arg, "P%d" % (i+5)))
+        self.append(".sub \"%s\" @ANON" % name, indent=False)
+        for (i,arg) in enumerate(self.args):
+            self.append(self.bindLocal(arg, "P%d" % (i+5)))
 
         label = self.genlabel("gen")
         self.append("newsub %s, .Coroutine, %s" % (gen,label))
