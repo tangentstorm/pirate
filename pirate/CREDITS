@@ -1,0 +1,12 @@
+
+Many thanks to:
+
+ A.M. Kuchling ( http://www.amk.ca/ )
+    wrote the original parrot-gen.py
+
+ Terry Reedy
+    laid out refactoring plan for self.expression()
+
+
+Whoever wrote the python compiler package :)
+ 
