@@ -1108,11 +1108,12 @@ def invoke(src, dump=0, lines=0):
     return o.read()
 
 if __name__=="__main__":
+    import os.path
     import sys
 
     #    if "-b" in sys.argv:
-    src = open('__builtin__.py').read()
-    out = open("__builtin__.imc","w")
+    src = open(os.path.join(sys.path[0],'__builtin__.py')).read()
+    out = open(os.path.join(sys.path[0],"__builtin__.imc"),"w")
     print >> out, compile(src,"__builtin__")
     out.close()
     #print "rebuilt builtins.imc"
