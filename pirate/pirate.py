@@ -432,7 +432,6 @@ class PirateVisitor(object):
                "@TODO: f(*x,**y) not working yet"
         
         args = []
-        node.args.reverse()
         for arg in node.args:
             var = self.symbol("arg")
             self.append(".local object %s" % var)

@@ -329,6 +329,16 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "1\n")
             
 
+    def test_arg_order(self):
+        res = self.run(
+            """
+            def dump(a, b):
+                print a, b, 
+            dump('a','b')
+            """, dump=0, lines=0)
+        self.assertEquals(res, "a b ")
+
+
     def test_lambda(self):
         res = self.run(
             """
@@ -579,8 +589,9 @@ class PirateTest(unittest.TestCase):
             #   print gen.next(),
             #except:
             #    print 'done'
-            """, dump=0, lines=0)
+            """, dump=0, lines=0)            
         self.assertEquals(res, "0 1 ") #done\n")
+
 
 ## @TODO: implement iterators (for x in g)
 ## waiting on *.next() for all objects.
