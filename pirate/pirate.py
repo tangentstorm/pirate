@@ -1040,7 +1040,14 @@ HEAD=\
 ''' % time.asctime()
 FOOT=\
 '''
-.include "pirate.imc"
+#
+# top level python exception handler
+#
+.sub __py__catch non_prototyped
+    set S0, P5['_message'] # P5 is the exception object
+    print S0
+    print "\\n"
+.end
 '''
 
 def compile(src, name="__main__"):
@@ -1083,13 +1090,6 @@ if __name__=="__main__":
     import os.path
     import sys
 
-    #    if "-b" in sys.argv:
-    src = open(os.path.join(sys.path[0],'__builtin__.py')).read()
-    out = open(os.path.join(sys.path[0],"__builtin__.imc"),"w")
-    print >> out, compile(src,"__builtin__")
-    out.close()
-    #print "rebuilt builtins.imc"
-    
     if len(sys.argv) > 1:
         # file or stdin?
 	if sys.argv[-1] == '-':
