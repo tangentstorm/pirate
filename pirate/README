@@ -74,9 +74,9 @@ to work with the new intermediate code compiler
 
 To get the code:
 
- cvs -d:pserver:anonymous@versionhost.com:/cvs/pirate login
+ cvs -d:pserver:anonymous@pirate.versionhost.com:/cvs/pirate login
  [no password]
- cvs -d:pserver:anonymous@versionhost.com:/cvs/pirate co pirate
+ cvs -d:pserver:anonymous@pirate.versionhost.com:/cvs/pirate co pirate
 
  
 If you want write access to cvs, drop me an email at 
