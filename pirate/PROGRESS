@@ -10,17 +10,18 @@
 
 ## these are done ###############################
 y visitAssign: 
+y visitAugAssign: # can't call __iadd__ etc until we have Python Objects
 y visitBreak:
 y visitCallFunc: # no */** args yet
 y visitContinue:
-y visitFor:      # no "else" clause yet
+y visitFor:
 y visitIf:
 y visitLambda:
 y visitList:
 y visitPrint:
 y visitPrintnl:
 y visitReturn:
-y visitWhile:    # no "else" clause yet
+y visitWhile:
 y visitPass:
 y visitFunction: # no */** args yet
 y visitTuple:    # but makes a list for now
@@ -79,7 +80,6 @@ n visitKeyword: keyword arguments (on calling side)
 
 
 ## assignments ###########
-n visitAugAssign:
 n visitAugName(self, node, mode):
 n visitAugSubscript(self, node, mode):
 n visitAugGetattr(self, node, mode):
