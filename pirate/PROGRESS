@@ -24,13 +24,19 @@ y visitWhile:    # no "else" clause yet
 y visitPass:
 y visitFunction: # no */** args yet
 y visitTuple:    # but makes a list for now
-y visitAssTuple: in visitAssign
-y visitAssList:  in visitAssign
+y visitAssName:  # in visitAssign
+y visitAssTuple: # in visitAssign
+y visitAssList:  # in visitAssign
+y visitGlobal:
+y visitListComp:
+y visitListCompFor:
+y visitListCompIf(self, node, branch):
 
 
 # e just means it was done in the expression() method
 # instead of its own visitXXX()
 e visitExpression: 
+e visitTest: used in pycodegen.py for visitAnd/visitOr
 e visitAdd:
 e visitAnd:
 e visitCompare:
@@ -46,8 +52,6 @@ e visitSub:
 
 ## not done yet #################################
 
-## global ################
-n visitGlobal:  need to tag somehow? (symbols.SymbolVisitor?)
 
 ## operators #############
 n visitBackquote:
@@ -71,7 +75,6 @@ n visitKeyword: keyword arguments (on calling side)
 
 
 ## assignments ###########
-n visitAssName:
 n visitAugAssign:
 n visitAugName(self, node, mode):
 n visitAugSubscript(self, node, mode):
@@ -93,13 +96,6 @@ n visitRaise:
 
 ## generators ############
 n visitYield:
-n closures (return function/lambda)
-
-
-## list comprehensions ###
-n visitListComp:
-n visitListCompFor:
-n visitListCompIf(self, node, branch):
 
 
 ## slices ################
@@ -119,11 +115,6 @@ n visitModule:
 n visitDiscard: (for free expressions, eg: "cout << 5")
 
 
-## not applicable ####################
-u visitTest: used in pycodegen.py for visitAnd/visitOr
-
-
 ## will not be supported #############
 - imaginary/complex numbers (2j) (because parser can't handle it)
 - visitEllipsis: extended slices (for Numeric, 2.3, etc)
-

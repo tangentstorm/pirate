@@ -307,6 +307,27 @@ class PirateTest(unittest.TestCase):
             print x
             """, dump=0)
         self.assertEquals(res, "dog\n")
+
+
+    ## list comprehensions #####################
+
+
+    def test_listcomp(self):
+        res = self.run(
+            """
+            print [x for x in ['c','a','t'] if x !='c']
+            """, dump=0)
+        self.assertEquals(res, "[a, t]\n") #@TODO: quote strings
+
+    def test_listcomp(self):
+        res = self.run(
+            """
+            print [x+y  for x in (1,2,3,4,5,6,7,8)
+                        if x > 4
+                        for y in (10,20)
+                        if x < 7]
+            """, dump=0)
+        self.assertEquals(res, "[15, 25, 16, 26]\n")
             
 
 

@@ -43,6 +43,7 @@ class imclist(list):
         return "(%s:%s)" % (func,line)
 
 
+
 class PirateVisitor(object):
 
     ##[ management stuff ]##########################################
@@ -111,6 +112,8 @@ class PirateVisitor(object):
         handler = {
             # new stye: return their own dest
             ast.Const:    self.expressConstant,
+
+            ast.ListComp: self.expressListComp,
             
             # old style (return nothing)
             ast.Name:     self.nameExpression,
@@ -168,7 +171,7 @@ class PirateVisitor(object):
 
 
     def listExpression(self, expr, dest):
-        self.append("%s = new PerlArray" % dest)
+        self.append("%(dest)s = new PerlArray" % locals())
         sym = self.symbol("$P")
         for item in expr.nodes:
             self.compileExpression(item, sym)
@@ -391,9 +394,60 @@ class PirateVisitor(object):
             self.append("%s = %s" % (dest, ref))
 
 
+    ##[ list comprehensions ]#######################################
+
+    # This section transforms a list comprhension into a
+    # set of nested for and if blocks.
+    #
+    # It's in the middle here because it uses expressXXX() AND visitXXX()
+    #
+    # @TODO: put this tree transformation in its own Visitor class
+    # but -- if we do that, we can only use nodes, not self.append()
+
+    global ListCompExpr # yech, but I wanted this all in one place.
+    class ListCompExpr(ast.Node):
+        def __init__(self, expr, pmc):
+            self.expr = expr
+            self.pmc = pmc
+
+    def expressListComp(self, node, dest):
+        self.set_lineno(node)
+        lcval = self.symbol("$P")
+        self.append("%(dest)s = new PerlArray" % locals())
+        queue = node.quals + [ListCompExpr(node.expr, dest)]
+        self.visit(self.comprehend(queue))
+        return dest
+
+    def comprehend(self, queue):
+        """
+        do our own walk of the tree and rebuild
+        using ast.For and ast.If
+        """
+        head, tail = queue[0], queue[1:]
+        if isinstance(head, ast.ListCompFor):
+            return ast.For(assign = head.assign,
+                           list = head.list,
+                           body = self.comprehend(head.ifs + tail),
+                           else_ = None)                         
+        elif isinstance(head, ast.ListCompIf):
+            return ast.If(tests = [(head.test, self.comprehend(tail))],
+                          else_ = None)
+        elif isinstance(head, ListCompExpr):
+            return head
+        else:
+            raise "i can't comprehend a %s" % head.__class__.__name__
+        
+
+    def visitListCompExpr(self, node):
+        exp = self.symbol("$P")
+        pmc = node.pmc
+        self.compileExpression(node.expr, exp)
+        self.append("push %(pmc)s, %(exp)s" % locals())
+        
 
     ##[ visitor methods ]##########################################
         
+
     def visitPrint(self, node):
         assert node.dest is None, "print >> not yet handled"
         for n in node.nodes:
