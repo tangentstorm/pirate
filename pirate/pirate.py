@@ -203,13 +203,19 @@ class PirateVisitor(object):
     def expressConstant(self, node, allocate):
         t = type(node.value)
         assert t in self.constMap, "unsupported const type:%s" % t
+
+        r = repr(node.value)
+        if r.startswith("'") and r.endswith("'"):
+            r = r.replace('"','\\"')
+            r = '"' + r[1:-1] + '"'
+            r = r.replace("\\'","'")
         if allocate:
             dest = self.gensym("const")
             self.append("%s = new %s" % (dest, self.constMap[t]))
-            self.append("%s = %s" % (dest, repr(node.value)))
+            self.append("%s = %s" % (dest, r))
             return dest
         else:
-            return repr(node.value)
+            return r
 
 
     def expressDict(self, node, allocate):
@@ -358,7 +364,7 @@ class PirateVisitor(object):
         self.append("%s = new PerlUndef" % dest)
         lside = self.compileExpression(node.left, allocate=1)
         rside = self.compileExpression(node.right)
-        if rside.startswith("'"):
+        if rside.startswith('"'):
             rside = self.compileExpression(node.right, allocate=1)
         
         op = self.infixOps[node.__class__]
