@@ -68,6 +68,8 @@ class PirateVisitor(object):
         self.vars = {}
         self.depth = depth or 0 # lexical scope depth
         self.globals = {}
+        self.classKnown = [] # only make one constructor per class
+        self.classStack = [] # the class we're looking at right now
 
     def gensym(self, prefix="$P", type="object"):
         """
@@ -97,7 +99,6 @@ class PirateVisitor(object):
         res += "    newclass P0, \"PythonIterator\" \n"
         res += "\n".join(self.lines) + "\n"
         res += ".end\n"
-        res += ".include 'pirate.imc'\n\n"
         res += "\n\n".join([s.getCode() for s in self.subs]) + "\n"
         return res
 
@@ -270,18 +271,22 @@ class PirateVisitor(object):
 
     def expressGetattr(self, node, allocate):
         dest = self.gensym("getattr")
-        self.set_lineno(node)
         attr = node.attrname
+
+        self.set_lineno(node)
         obj = self.compileExpression(node.expr, allocate=1)
-        self.append("getprop %s, '%s', %s" % (dest, attr, obj))
-        self.append("P5 = %s" % obj) # for pcc, in case we call the attr
-        self.assertNotUndefined(dest, 'AttributeError: ' + attr)
+        self.append("%s = __py__getattr(%s, '%s')" % (dest, obj, attr))
+
+        # save base object in P% for calling conventions
+        # @TODO: only do this if we're going to call the attr
+        self.append("P5 = %s" % obj)
         return dest
     
         
     def nameExpression(self, node, allocate):
         dest = self.lookupName(node.name)
         return dest
+
 
     def listExpression(self, expr, allocate):
         dest = self.gensym("list")
@@ -441,7 +446,7 @@ class PirateVisitor(object):
         self.set_lineno(node)
 
         # functions are always anonymous, so make fake names
-        sub = self.genlabel("_sub")
+        sub = self.genlabel(self.name + "_" + str(name))
         ref = self.gensym("func")
 
         # but sometimes they have a name bound to them (def vs lambda):
@@ -602,6 +607,10 @@ class PirateVisitor(object):
             self.append(self.bindGlobal(name, value))
         else:            
             self.append(self.bindLocal(name, value))
+            # @TODO: bindAttribute 
+            if self.classStack:
+                self.append("setprop %s, '%s', %s"
+                            % (self.classStack[-1], name, value))
 
 
     def visitAssign(self, node):
@@ -816,7 +825,11 @@ class PirateVisitor(object):
         self.append("noop")
 
     def visitFunction(self, node):  # visitDef
-        self.genFunction(node, node.name, allocate=1)
+        fun = self.genFunction(node, node.name, allocate=1)
+        if self.classStack:
+            klass = self.classStack[-1]
+            self.append("setprop %s, '%s', %s" % (klass, node.name, fun))
+            
 
     def visitReturn(self, node):
         raise SyntaxError, "return outside of function"
@@ -831,13 +844,9 @@ class PirateVisitor(object):
         assert node.expr1, "argument required for raise"
         assert not (node.expr2 or node.expr3), "only 1 arg alllowed for raise"
         self.set_lineno(node)
-        ex = self.gensym("ex")
-        self.append(ex + " = new Exception ")
         msg = self.compileExpression(node.expr1)
-        sreg = self.gensym("$S", type=None)
-        self.append("%s = %s" % (sreg, msg))
-        self.append("%s['_message'] = %s" % (ex, sreg))
-        self.append("throw " + ex)
+        self.append("__py__raise(%s)" % msg)
+
     def visitAssert(self, node):
         # another tree transformation -- if not .test: raise .fail
         self.visit( ast.If(
@@ -885,14 +894,50 @@ class PirateVisitor(object):
 
     def visitClass(self, node):
         name = node.name
-        klass = self.gensym("klass")
-        cname = self.gensym("cname")
-        self.append("newclass %s, '%s'" % (klass, name))
-        self.append(cname + " = new PerlString")
-        self.append("%s = '%s'" % (cname, name))
-        self.append("setprop %s, '__name__', %s" % (klass, cname))
+        klass = self.gensym("klass", "object")
+        
+        # Python classes need to be callable, but ParrotClass
+        # is not. So we make a constructor instead.
+        # Classes with the same name will have identical
+        # constructors, so no need to create several versions:
+
+        if name not in self.classKnown:
+
+            self.append("newclass %s, '%s'" % (klass, name))
+            self.append("register %s" % klass)
+
+            sub = []
+            sub.append(".pcc_sub __new__%s non_prototyped" % name)
+            sub.append("    .local object instance")
+            sub.append("    find_type $I0, '%s'" % name)
+            sub.append("    new instance, $I0")
+            # calling conventions say P0 is this "ConstructorClass" sub
+            # so this lets us do instance.__class__.__name__ ...
+            sub.append("    setprop instance, '__class__', P0") 
+            sub.append("    .pcc_begin_return")
+            sub.append("        .return instance")
+            sub.append("    .pcc_end_return")
+            sub.append(".end") 
+            self.classKnown.append(name)
+
+            # Adds the new sub we just made to the subs list.
+            # @TODO: mmm... smells like javascript (refactor me!)
+            class Object: pass
+            subObj = Object()
+            subObj.getCode = lambda: "\n".join(sub)
+            self.subs.append(subObj)
+
+        # now make the constructor object:
+        self.append("newsub %s, .Sub, __new__%s" % (klass, name))
+        namesym = self.gensym("name")
+        self.append(namesym + " = new PerlString")
+        self.append("%s = '%s'" % (namesym, name))
+        self.append("setprop %s, '__name__', %s" % (klass, namesym))
         self.append(self.bindLocal(name, klass))
 
+        self.classStack.append(klass)
+        self.visit(node.code)
+        self.classStack.pop()
         
 
 class PirateSubVisitor(PirateVisitor):
@@ -1011,14 +1056,33 @@ class PirateSubVisitor(PirateVisitor):
                 
 ## module interface ###############################################
 
-def compile(src):
+import time
+HEAD=\
+'''
+# generated by pirate on %s
+''' % time.asctime()
+FOOT=\
+'''
+.include "pirate.imc"
+.include "__builtin__.imc"
+'''
+
+def compile(src, name="__main__"):
     ast = compiler.parse(src)
     vis = compiler.visitor.ASTVisitor()
-    pir = PirateVisitor("__main__")
-    vis.preorder(ast, pir)    
+    pir = PirateVisitor(name)
+    vis.preorder(ast, pir)
     pir.append("end")
-    return pir.getCode()
-    
+    #@TODO: refactor this mess:
+    if name=="__main__":
+        lines = [".local object range",
+                 "newsub range, .Sub, __builtin___range0",
+                 "store_lex 0, 'range', range"]
+
+        pir.lines = lines + pir.lines
+    code =  pir.getCode()
+    return code
+                
 
 def line_nos(seq):
     return [(i+1, seq[i]) for i in range(len(seq))]
@@ -1032,13 +1096,25 @@ def invoke(src, dump=0, lines=0):
             for no, line in line_nos(code.split("\n")):
                 print "% 4i: %s" % (no, line)
         else:
+            print HEAD
             print code
+            print FOOT
+    print >> i, HEAD
     print >> i, code
+    print >> i, FOOT
     i.close()    
     return o.read()
 
 if __name__=="__main__":
     import sys
+
+    #    if "-b" in sys.argv:
+    src = open('__builtin__.py').read()
+    out = open("__builtin__.imc","w")
+    print >> out, compile(src,"__builtin__")
+    out.close()
+    #print "rebuilt builtins.imc"
+    
     if len(sys.argv) > 1:
         # file or stdin?
 	if sys.argv[-1] == '-':

@@ -698,22 +698,38 @@ class PirateTest(unittest.TestCase):
     def test_class(self):
         res = self.run(
             """
-            class Stuff:
-                x = 'x'
+            class Stuff: pass       # throw one away
+            class Stuff: x = 'x'
             print Stuff.__name__ #@TODO:, Stuff.x
             """, dump=0)
         self.assertEquals(res, "Stuff\n")
 
+    
     def test_instance(self):
         res = self.run(
             """
             class Thing:
-                pass
-            x = Thing #@TODO: Thing()
-            x.y = 1
-            print x.y
+                z = 0
+            t1 = Thing()
+            t1.x = 1
+            t2 = Thing()
+            t2.x = 2
+            print t1.x, t2.x,
+            print t1.z, t2.z,
+            print t1.__class__.__name__
             """, dump=0)
-        self.assertEquals(res, "1\n")
+        self.assertEquals(res, "1 2 0 0 Thing\n")
+
+
+    def test_methods(self):
+        res = self.run(
+            """
+            class Hello:
+                def talk(self):
+                    print 'hello!'
+            Hello().talk()
+            """, dump=1)
+        self.assertEquals(res, "hello!\n")
 
 
     ## PARROT_INLINE ##################################
@@ -727,6 +743,25 @@ class PirateTest(unittest.TestCase):
             )
             """, dump=0)
         self.assertEquals(res, 'cat\n')
+
+    ## __builtin__ ####################################
+
+    def test_range(self):
+        res = self.run(
+            """
+            print range(0,0,1)
+            print range(0,5,1)
+            print range(0,10,1)
+            print range(0,10,2)
+            """, dump=0)
+        goal = trim(
+            """
+            []
+            [0, 1, 2, 3, 4]
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+            [0, 2, 4, 6, 8]
+            """)
+        self.assertEquals(res, goal)
 
 
 if __name__=="__main__":
