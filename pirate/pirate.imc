@@ -4,7 +4,7 @@
 # python print routine (special case for lists)
 # @TODO: make this return a string and call it str() 
 #
-.pcc_sub __py__print non_prototyped
+.pcc_sub __py__print prototyped
     .param object s
     .param int nested
     typeof $S0, s
@@ -73,7 +73,7 @@
 #
 # getattr()
 #
-.pcc_sub __py__getattr non_prototyped
+.pcc_sub __py__getattr prototyped
     .param object obj
     .param string name
     #@TODO: .param ifNone
