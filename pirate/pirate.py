@@ -16,6 +16,7 @@ usage:  pirate.py [-d] filename.py
 
 import os
 import compiler
+from compiler import ast        
 
 class PirateVisitor:
 
@@ -73,80 +74,79 @@ class PirateVisitor:
         for line in lines:
             self.append(line)
 
+
     ##[ expression compiler ]######################################
     
-    typeMap = {
-        str: "PerlString",
-        int: "PerlInt",
-    }
-
-    def expression(self, expr, dest):
+    def expression(self, node, dest):
         """
-        create code to eval expression Node 'expr' and put it in 'dest'
+        In CPython, expression results just get pushed
+        onto the stack. But since parrot uses registers
+        instead, we need to to specify a destination 
+        for each expression, and so we have to do our
+        own dispatching outside the normal visitor walk.
         """
-        klass = expr.__class__
-        
-        ## plain old variables
-        if klass==compiler.ast.Name:
-            return ["%s = %s" % (dest, expr.name)]
-
-        ## constants
-        elif klass==compiler.ast.Const:
-            t = type(expr.value)
-            assert t in self.typeMap, "unsupported const type:%s" % t
-            return [("%s = new %s" % (dest, self.typeMap[t])),
-                    ("%s = %s" % (dest, repr(expr.value)))]
-
-        ## lists
-        elif klass==compiler.ast.List:
-            res = ["%s = new PerlArray" % dest]
-            sym = self.symbol("$P")
-            for item in expr.nodes:
-                res.extend(self.expression(item, sym))
-                res.append("push %s, %s" % (dest, sym))
-            return res
-        
-        ## math expressions
-        elif klass in self.infixOps:
-            return self.infixExpression(expr, dest)
-
-        ## comparisons
-        elif klass==compiler.ast.Compare:
-            return self.compareExpression(expr, dest)
-
-        ## boolean logic
-        elif klass in self.logicOps:
-            return self.logicExpression(expr, dest)
-
-        ## function call
-        elif klass==compiler.ast.CallFunc:
-            return self.callingExpression(expr, dest)
-
-        ## lambda:
-        elif klass==compiler.ast.Lambda:
-            return self.lambdaExpression(expr, dest)
-
-        ## stuff to do... :)
-        else:
-            print
-            print
-            print "*** UNKNOWN EXPRESSION ****"
+        handler = {
+            ast.Name:     self.variableExpression,
+            ast.Const:    self.constantExpression,
+            ast.List:     self.listExpression,
+            ast.Lambda:   self.lambdaExpression,
+            ast.CallFunc: self.callingExpression,
+            ast.Compare:  self.compareExpression,
+            
+            ast.Or:  self.logicExpression,
+            ast.And: self.logicExpression,
+            ast.Not: self.logicExpression,
+            
+            ast.Add: self.infixExpression,
+            ast.Sub: self.infixExpression,
+            ast.Mul: self.infixExpression,
+            ast.Div: self.infixExpression,
+            ast.Mod: self.infixExpression,
+        }
+        try:
+            return handler[node.__class__](node, dest)
+        except KeyError:
+            print "## unknown expression:"
             print expr
-            print "*** entering debugger ****"
-            print
+            print "## entering debugger..."
             print
             import pdb; pdb.set_trace()
 
 
+    constMap = {
+        str: "PerlString",
+        int: "PerlInt",
+    }
+
+    def constantExpression(self, expr, dest):
+        t = type(expr.value)
+        assert t in self.constMap, "unsupported const type:%s" % t
+        return [("%s = new %s" % (dest, self.constMap[t])),
+                ("%s = %s" % (dest, repr(expr.value)))]
+
+    def variableExpression(self, expr, dest):
+        return ["%s = %s" % (dest, expr.name)]
+
+
+    def listExpression(self, expr, dest):
+        res = ["%s = new PerlArray" % dest]
+        sym = self.symbol("$P")
+        for item in expr.nodes:
+            res.extend(self.expression(item, sym))
+            res.append("push %s, %s" % (dest, sym))
+        return res
+        
+
+
     infixOps = {
-        compiler.ast.Add: "+",
-        compiler.ast.Sub: "-",
-        compiler.ast.Mul: "*",
-        compiler.ast.Div: "/",
-        compiler.ast.Mod: "%",
-        #compiler.ast.Power: "**",        # doesn't work yet
-        #compiler.ast.RightShift: '>>',   # untested
-        #compiler.ast.LeftShift: '<<',    # untested
+        ast.Add: "+",
+        ast.Sub: "-",
+        ast.Mul: "*",
+        ast.Div: "/",
+        ast.Mod: "%",
+        #ast.Power: "**",        # doesn't work yet
+        #ast.RightShift: '>>',   # untested
+        #ast.LeftShift: '<<',    # untested
     }
 
         
@@ -205,9 +205,9 @@ class PirateVisitor:
 
 
     logicOps = {
-        compiler.ast.Not: '!',
-        compiler.ast.And: 'and',
-        compiler.ast.Or: 'or',
+        ast.Not: '!',
+        ast.And: 'and',
+        ast.Or: 'or',
     }
 
 
@@ -231,8 +231,6 @@ class PirateVisitor:
         assert not (node.star_args or node.dstar_args), \
                "f(*x,**y) not working yet"
         
-        #assert node.node.__class__ != compiler.ast.Lambda, \
-        #       "can't call lambdas directly yet" # @TODO: fix this!
         res = []
         node.args.reverse()
         for arg in node.args:
@@ -244,7 +242,7 @@ class PirateVisitor:
 
         # figure out what we're calling
         adr = self.symbol("$I")
-        if isinstance(node.node, compiler.ast.Lambda):
+        if isinstance(node.node, ast.Lambda):
             # lambdas don't have names!
             self.extend(self.lambdaExpression(node.node, adr, allocate=0))
         else:
@@ -278,7 +276,7 @@ class PirateVisitor:
         pir = PirateVisitor(sub,
                             doc="lambda from line %s" % node.lineno,
                             args=node.argnames)
-        vis.preorder(compiler.ast.Return(node.code), pir)
+        vis.preorder(ast.Return(node.code), pir)
         self.subs.append(pir)
 
         # store the address in dest
@@ -311,13 +309,13 @@ class PirateVisitor:
 
 
     def visitIf(self, node):
-        _endif = self.symbol("_endif")
+        _endif = self.symbol("endif")
         
         for test, body in node.tests:
 
             # if not true, goto _elif
             self.extend(self.set_lineno(test))
-            _elif = self.symbol("_elif")
+            _elif = self.symbol("elif")
             testvar = self.symbol("test")
 
             self.append(".local object %s" % testvar)
@@ -344,7 +342,7 @@ class PirateVisitor:
     def visitAssign(self, node):
         leftside = node.nodes[0]
         rightside = node.expr
-        if isinstance(leftside, compiler.ast.AssTuple):
+        if isinstance(leftside, ast.AssTuple):
             leftside = leftside.nodes
             rightside = rightside.nodes
         else:
@@ -375,13 +373,13 @@ class PirateVisitor:
 
     def visitFor(self, node):
         assert node.else_ is None, "for...else not supported"
-        assert not isinstance(node.assign, compiler.ast.AssTuple), \
+        assert not isinstance(node.assign, ast.AssTuple), \
                "for x,y not implemented yet"
 
         self.extend(self.set_lineno(node))
         self.append(".local object %s" % node.assign.name)
-        _for = self.symbol("_for")
-        _endfor = self.symbol("_endfor")
+        _for = self.symbol("for")
+        _endfor = self.symbol("endfor")
         loopidx = self.symbol("idx")
         forlist = self.symbol("list")
         listlen = self.symbol("$I")
