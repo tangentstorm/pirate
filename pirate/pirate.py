@@ -24,7 +24,7 @@ class PirateVisitor:
         """
         self.counter.setdefault(prefix,0)
         self.counter[prefix] += 1
-        return "%s%04x" % (prefix, self.counter[prefix])
+        return "%s%05i" % (prefix, self.counter[prefix])
     
 
     def set_lineno (self, node):
@@ -49,6 +49,17 @@ class PirateVisitor:
 
     ##[ expression compiler ]######################################
 
+    infixOps = {
+        compiler.ast.Add: "+",
+        compiler.ast.Sub: "-",
+        compiler.ast.Mul: "*",
+        compiler.ast.Div: "/",
+        compiler.ast.Mod: "%",
+        #compiler.ast.Power: "**",        # doesn't work yet
+        #compiler.ast.RightShift: '>>',   # untested
+        #compiler.ast.LeftShift: '<<',    # untested
+    }
+
     def expression(self, expr, dest):
         """
         create code to eval expression Node 'expr' and put it in 'dest'
@@ -57,6 +68,35 @@ class PirateVisitor:
             return ["%s = %s" % (dest, expr.name)]
         elif isinstance(expr, compiler.ast.Const):
             return ["%s = %s" % (dest, repr(expr.value))]
+        elif isinstance(expr, tuple(self.infixOps.keys())):
+            operator = self.infixOps[expr.__class__]
+            symleft,  typleft  = self.symbol("$P"), "PerlInt"
+            symright, typright = self.symbol("$P"), "PerlInt"
+            symexpr,  typexpr  = self.symbol("$P"), "PerlInt"
+            res = []
+            
+            # store left side of expression in symleft:
+            res.append("%s = new %s" % (symleft, typleft))
+            res.extend(self.expression(expr.left, symleft))
+            
+            # store right side of expression in symright:
+            res.append("%s = new %s" % (symright, typright))
+            res.extend(self.expression(expr.right, symright))
+
+            # store the combined value in symexpr
+            res.append("%s = new %s" % (symexpr, typexpr))
+            res.append("%s = %s %s %s" \
+                       % (symexpr, symleft, operator, symright))
+
+            # and finally put the result in our destination
+            # (imcc seems to like this as a separate step for
+            # typecasting or something...)
+            res.append("%s = %s" % (dest, symexpr))
+            return res
+        else:
+            print "*** UNKNOWN EXPRESSION ****"
+            print "*** entering debugger ****"
+            import pdb; pdb.set_trace()
         
     ##[ visitor methods ]##########################################
         
@@ -111,7 +151,7 @@ class PirateVisitor:
             rightside = [rightside]
         for node, expr in zip(leftside, rightside):
             name = node.name
-            self.append(".local string %s" % name) 
+            self.append(".local string %s" % name)
             self.extend(self.expression(expr, name))
 
 ## module interface ###############################################

@@ -72,6 +72,18 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(result, "1 2 3\n")
 
 
+    def test_math(self):
+        result = pirate.invoke(trim(
+            """
+            x = (1 + 2) * 3 - 4
+            print x % 3
+            print 4/2  # note: this returns a float in parrot
+            """), dump=0)
+        self.assertEquals(result, "2\n2.000000\n")
+
+            
+
+
 if __name__=="__main__":
     unittest.main()
     
