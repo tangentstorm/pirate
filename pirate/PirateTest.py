@@ -651,20 +651,36 @@ class PirateTest(unittest.TestCase):
         res = self.run(            
             """
             from __future__ import generators #@TODO: 2.3
-            def make_count(step):
-                def count():
-                    x = 0
-                    while 1:                        
-                        yield x
-                        x = x + step
-                return count()
-            gs = [make_count(0), make_count(1)]
-            for i in [1,2,3,4]:
-                for g in gs:
-                    print g.next(), 
-
+            def make_repeater(s):
+                def repeat():
+                    while 1:
+                        yield s
+                return repeat()
+            a = make_repeater('a')
+            b = make_repeater('b')
+            for x in [1,2,3,4]:
+                print a.next(),
+                print b.next(),
             """, dump=0, lines=0)
-        self.assertEquals(res, "0 0 0 1 0 2 0 3 ")
+        self.assertEquals(res, "a b a b a b a b ")
+
+    def test_microthreads_more(self):
+        # like above but modifies a variable inside the coroutine
+        # This test exposes a bug where the list were're iterating
+        # through in the "for" loop is replaced with the continuation.
+        res = self.run(            
+            """
+            from __future__ import generators #@TODO: 2.3
+            def count():
+                x = 0
+                while 1:                        
+                    yield x
+                    x = x + 1
+            g = count()
+            for i in [1,2,3]:
+                print g.next(),
+            """, dump=0, lines=0)
+        self.assertEquals(res, "0 1 2 ")
             
 ## @TODO: implement iterators (for x in g)
 ## waiting on *.next() for all objects.

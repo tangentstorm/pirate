@@ -274,6 +274,7 @@ class PirateVisitor(object):
         attr = node.attrname
         obj = self.compileExpression(node.expr, allocate=1)
         self.append("getprop %s, '%s', %s" % (dest, attr, obj))
+        self.append("P5 = %s" % obj) # for pcc, in case we call the attr
         self.assertNotUndefined(dest, 'AttributeError: ' + attr)
         return dest
     
@@ -418,21 +419,17 @@ class PirateVisitor(object):
             sub_pmc = self.compileExpression(node.node)
         else:
             sub_pmc = self.lookupName(node.node.name)
-        ret = self.genlabel("ret")
-        ret_pmc = self.gensym("ret_pmc")
 
         ## now call it:
-        self.append("savetop")
-        self.append("newsub %s, .Continuation, %s" % (ret_pmc, ret))
         self.append(".pcc_begin non_prototyped")
         for r in args:
             self.append(r)
-        self.append('.pcc_call %s, %s' % (sub_pmc, ret_pmc))
-        self.append('%s:' % ret)
+        self.append('.pcc_call %s' % sub_pmc)
         dest = self.gensym("result")
         self.append(".result %s" % dest)
         self.append(".pcc_end")
         return dest
+
 
     def lambdaExpression(self, node, allocate=0):
         return self.genFunction(node, None, allocate=0)
@@ -966,6 +963,7 @@ class PirateSubVisitor(PirateVisitor):
         res.append("   .return gen_obj")
         res.append("   .pcc_end_return")
         res.append(".end")
+
         res.append(".pcc_sub %s_g non_prototyped" % name)
         res.append("   new_pad -1")
         res.extend(self.lines)
@@ -997,11 +995,19 @@ class PirateSubVisitor(PirateVisitor):
     def visitYield(self, node):
         self.isGenerator = 1
         result = self.compileExpression(node.value, allocate=1)
+        next = self.gensym("next", "object")
+        self.append("newsub %s, .Coroutine, label_%s" % (next,next))
+
+        # P5 is the generator object. We know this because we
+        # set it in getattr so we'd comply with the calling
+        # conventions.
+        self.append("setprop P5, 'next', %s" % next)
+
         self.append(".pcc_begin_yield")
         self.append(".return " + result)
         self.append(".pcc_end_yield")
-        
-        
+        self.append("label_%s:" % next)
+
                 
 ## module interface ###############################################
 
