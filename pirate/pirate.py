@@ -230,8 +230,9 @@ class PirateVisitor:
     def callingExpression(self, node, dest):
         assert not (node.star_args or node.dstar_args), \
                "f(*x,**y) not working yet"
-        assert node.node.__class__ != compiler.ast.Lambda, \
-               "can't call lambdas directly yet" # @TODO: fix this!
+        
+        #assert node.node.__class__ != compiler.ast.Lambda, \
+        #       "can't call lambdas directly yet" # @TODO: fix this!
         res = []
         node.args.reverse()
         for arg in node.args:
@@ -239,15 +240,24 @@ class PirateVisitor:
             res.append(".local object %s" % var)
             res.extend(self.expression(arg, var))
             res.append(".arg %s" % var)
+            
 
-        #@TODO: use parrot calling conventions (invoke)
-        #@TODO: __py__ should use "from __parrot__ import __py__print"
+        # figure out what we're calling
         adr = self.symbol("$I")
-        sub = node.node.name
-        if sub.startswith("__py__"):
-            res.append("%s = addr %s" % (adr, node.node.name))
+        if isinstance(node.node, compiler.ast.Lambda):
+            # lambdas don't have names!
+            self.extend(self.lambdaExpression(node.node, adr, allocate=0))
         else:
-            res.append("%s = %s" % (adr, sub))
+            sub = node.node.name
+            if sub.startswith("__py__"):
+                # parrot sub. @TODO: "from __parrot__ import __py__print"
+                res.append("%s = addr %s" % (adr, node.node.name))
+            else:
+                # normal sub:
+                res.append("%s = %s" % (adr, sub))
+
+        # do the jump and return the result
+        # @TODO: use parrot calling conventions (invoke)
         res.append('jsr %s' % adr)
         if dest:
             res.append(".result %s" % dest)
@@ -255,24 +265,28 @@ class PirateVisitor:
 
 
 
-    def lambdaExpression(self, node, dest):
+    def lambdaExpression(self, node, dest, allocate=1):
         assert not node.kwargs or node.varargs, "only simple args for now"
         self.extend(self.set_lineno(node))
-        #self.subs.append(self.expression(
-        #import pdb; pdb.set_trace()
-        
+
+        # anonymous function, so no name
         sub = self.symbol("_sub")
         adr = self.symbol("$I")
+
+        # fork a new code generator to walk the function's tree:
         vis = compiler.visitor.ASTVisitor()
         pir = PirateVisitor(sub,
-                            doc="lambda [line %s]" % node.lineno,
+                            doc="lambda from line %s" % node.lineno,
                             args=node.argnames)
         vis.preorder(compiler.ast.Return(node.code), pir)
-
         self.subs.append(pir)
-        return ["%s = addr %s" % (adr, sub),
-                "%s = new PerlInt" % dest,
-                "%s = %s" % (dest, adr)]
+
+        # store the address in dest
+        res = ["%s = addr %s" % (adr, sub)]
+        if allocate:
+            res.append("%s = new PerlInt" % dest)
+        res.append("%s = %s" % (dest, adr))
+        return res
 
 
 

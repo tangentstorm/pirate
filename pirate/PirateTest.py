@@ -15,7 +15,7 @@ def trim(s):
     return "\n".join([line[indent:] for line in lines])
 
 def run(src, dump=0, lines=1):    
-    return pirate.invoke(trim(src), dump, lines=0)
+    return pirate.invoke(trim(src), dump, lines=lines)
 
 class PirateTest(unittest.TestCase):
 
@@ -189,9 +189,17 @@ class PirateTest(unittest.TestCase):
             """
             f = lambda x: x+1
             print f(4), f(5)
-            """, dump=0, lines=0)
+            """, dump=0, lines=1)
         self.assertEquals(res, "5 6\n")
         
+    def test_lambda_anonymous(self):
+        res = run(
+            """
+            print (lambda x: x*x)(5)
+            """, dump=0, lines=0)
+        self.assertEquals(res, "25\n")
+            
+
         
 if __name__=="__main__":
     unittest.main()
