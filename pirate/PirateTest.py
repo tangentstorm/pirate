@@ -14,14 +14,15 @@ def trim(s):
     indent = len(lines[0]) - len(lines[0].lstrip())
     return "\n".join([line[indent:] for line in lines])
     
+def run(src, dump=0):
+    return pirate.invoke(trim(src), dump)
 
 class PirateTest(unittest.TestCase):
-
 
     def test_compile(self):
         # in general, won't actually test bytecode, but
         # this is just a simple case to show the interface
-        result = pirate.compile(trim(
+        res = pirate.compile(trim(
             """
             print
             """))
@@ -31,20 +32,20 @@ class PirateTest(unittest.TestCase):
                 print "\\n"
                 end
             """)
-        assert result == goal, "bad bytecode from compile():\n%s" % result
+        assert res == goal, "bad bytecode from compile():\n%s" % res
 
     
     def test_print(self):
-        result = pirate.invoke(trim(
+        res = run(
             """
             print 'hello,',
             print 'world!'
-            """), dump=0)
-        self.assertEquals(result, "hello, world!\n")
+            """)
+        self.assertEquals(res, "hello, world!\n")
 
 
     def test_if(self):
-        result = pirate.invoke(trim(
+        res = run(
             """
             if 1:
                 print 'shiver me timbers!'
@@ -58,55 +59,57 @@ class PirateTest(unittest.TestCase):
                 print 'walk the plank!'
             elif 1:
                 print 'avast, ye landlubbers!'
-            """), dump=0)
-        self.assertEquals(result,  "shiver me timbers!\n" \
+            """)
+        self.assertEquals(res,  "shiver me timbers!\n" \
                                  + "yar har har!\n" \
                                  + "avast, ye landlubbers!\n")
 
     def test_assignment(self):
-        result = pirate.invoke(trim(
+        res = run(
             """
             a = 1
             b, c = 2, 3
             print a, b, c
-            """), dump=0)
-        self.assertEquals(result, "1 2 3\n")
+            """)
+        self.assertEquals(res, "1 2 3\n")
 
 
     def test_math(self):
-        result = pirate.invoke(trim(
+        res = run(
             """
             x = (1 + 2) * 3 - 4
             print x % 3
             print 4/2  # note: this returns a float in parrot
-            """), dump=0)
-        self.assertEquals(result, "2\n2.000000\n")
+            """)
+        self.assertEquals(res, "2\n2.000000\n")
 
     def test_while(self):
-        result = pirate.invoke(trim(
+        res = run(
             """
             x = 3
             while x:
                 print x,
                 x = x - 1
-            """), dump=0)
-        self.assertEquals(result, "3 2 1 ")
+            """)
+        self.assertEquals(res, "3 2 1 ")
 
 
     def test_compare(self):
-        result = pirate.invoke(trim(
+        res = run(
             """
             #@TODO: print 1<2<3
             print 1==1, 0!=0, 1>0, 1<=5,
             print 1>=5, 4<>3
-            """), dump=0)
-        self.assertEquals(result, "1 0 1 1 0 1\n")
+            """)
+        self.assertEquals(res, "1 0 1 1 0 1\n")
+
 
     def test_euclid(self):
-        result = pirate.invoke(open("euclid.py").read(), dump=0)
-        self.assertEquals(result, "96 64\n32\n")
-           
-                                                                    
+        # amk's example program:
+        res = pirate.invoke(open("euclid.py").read(), dump=0)
+        self.assertEquals(res, "96 64\n32\n")
+
+
 if __name__=="__main__":
     unittest.main()
     
