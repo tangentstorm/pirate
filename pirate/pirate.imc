@@ -1,6 +1,6 @@
 ## pirate standard library
 
-.sub _pyprint
+.sub __py__print
     #
     # python print routine (special case for lists)
     # 
@@ -22,7 +22,7 @@
             if i >= len goto endloop
             item = s[i]
             .arg item
-            call _pyprint
+            call __py__print
             i = i + 1
             if i >= len goto endloop
             print ", "
