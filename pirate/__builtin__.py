@@ -30,9 +30,7 @@ def range(x, y, step):
     else:  # step must be < 0, or we would have raised ValueError
         if stop >= start: # no work for us
             return []
-    howmany = (start - stop - step  - 1)/-step
-
-    howmany = howmany - 2 #@TODO: fix the math in pirate!!
+        howmany = (start - stop - step - 1)/-step
 
     PARROT_INLINE('find_lex $P0, "howmany"')
     PARROT_INLINE('$I0 = $P0')

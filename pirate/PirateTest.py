@@ -116,6 +116,14 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "2 2\n")
 
 
+    def test_concat(self):
+        res = self.run(
+            """
+            print "foo" + "bar"
+            """, dump=0)
+        self.assertEquals(res, "foobar\n")
+
+
     def test_compare(self):
         res = self.run(
             """

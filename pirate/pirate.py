@@ -350,6 +350,8 @@ class PirateVisitor(object):
         self.append("%s = new PerlUndef" % dest)
         lside = self.compileExpression(node.left, allocate=1)
         rside = self.compileExpression(node.right)
+        if rside.startswith("'"):
+            rside = self.compileExpression(node.right, allocate=1)
         
         op = self.infixOps[node.__class__]
         self.append("%s = %s %s %s" % (dest, lside, op, rside))
@@ -1088,7 +1090,7 @@ def line_nos(seq):
     return [(i+1, seq[i]) for i in range(len(seq))]
 
 def invoke(src, dump=0, lines=0):
-    i,o = os.popen4("parrot -")
+    i,o = os.popen4("parrot --python -")
     code = compile(src)
     if dump:
         print
