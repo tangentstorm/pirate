@@ -153,7 +153,7 @@ class PirateVisitor(object):
             # old style (return nothing)
             ast.Name:     self.nameExpression,
             ast.List:     self.listExpression,
-            ast.Tuple:    self.listExpression, # tuples ares lists for now
+            ast.Tuple:    self.tupleExpression,
             ast.Lambda:   self.lambdaExpression,
             ast.CallFunc: self.callingExpression,
             ast.Compare:  self.compareExpression,
@@ -287,13 +287,21 @@ class PirateVisitor(object):
         dest = self.lookupName(node.name)
         return dest
 
-
     def listExpression(self, expr, allocate):
-        dest = self.gensym("list")
+        dest = self.gensym("list", "PerlArray")
         self.append(dest + " = new PerlArray")
         for item in expr.nodes:
             sym = self.compileExpression(item)
             self.append("push %s, %s" % (dest, sym))
+        return dest
+
+    def tupleExpression(self, expr, allocate):
+        dest = self.gensym("list", "FixedPMCArray")
+        self.append(dest + " = new FixedPMCArray")
+        self.append("%s=%d" % (dest,len(expr.nodes)))
+        for i in range(0,len(expr.nodes)):
+            sym = self.compileExpression(expr.nodes[i])
+            self.append("%s[%d]=%s" % (dest, i, sym))
         return dest
     
     typemap = {

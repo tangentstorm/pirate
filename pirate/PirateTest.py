@@ -177,27 +177,6 @@ class PirateTest(unittest.TestCase):
     ## @TODO: implement objects
     ## (waiting on python PMC's or parrot object layer)
 
-    ## tests that are not QUITE ready #####################
-
-    def test_return_tuple(self):
-        #@TODO: make tuples be tuples once there's a .PythonTuple
-        res = self.run(
-            """
-            a, b, c = (lambda: (1,2,3))()
-            print a, b, c
-            a = (lambda: (4,5,6))()
-            print a
-            """, dump=0, lines=1)
-        self.assertEquals(res, "1 2 3\n[4, 5, 6]\n")
-
-    def test_tuple(self):
-        #@TODO: make tuples be tuples once there's a .PythonTuple
-        res = self.run(
-            """
-            print (1,2,(3,4),5)
-            """)
-        self.assertEquals(res, "[1, 2, [3, 4], 5]\n")
-
 if __name__=="__main__":
     import new
     import sys
@@ -206,7 +185,6 @@ if __name__=="__main__":
     # For every test/*/filename.py file, create a test_filename method
     for test in sys.argv[1:] or glob("test/*/*.py"):
         testName = "test_" + os.path.splitext(os.path.split(test)[1])[0]
-        if hasattr(PirateTest, testName): continue
 
         testFunc = lambda self, test=test: self.runTest(test)
         testFunc.__doc__ = testName
