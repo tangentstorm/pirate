@@ -57,11 +57,6 @@ class PirateVisitor:
             self.append(line)
 
     ##[ expression compiler ]######################################
-
-    logicOps = {
-        compiler.ast.And: '&&',
-        compiler.ast.Or: '||',
-    }
     
     typeMap = {
         str: "PerlString",
@@ -99,6 +94,10 @@ class PirateVisitor:
         ## comparisons
         elif isinstance(expr, compiler.ast.Compare):
             return self.compareExpression(expr, dest)
+
+        ## boolean logic
+        elif isinstance(expr, tuple(self.logicOps.keys())):
+            return self.logicExpression(expr, dest)
 
         ## stuff to do... :)
         else:
@@ -175,6 +174,28 @@ class PirateVisitor:
         res.append("%s:" % _end)
         return res
 
+
+    logicOps = {
+        compiler.ast.Not: '!',
+        compiler.ast.And: 'and',
+        compiler.ast.Or: 'or',
+    }
+
+
+    def logicExpression(self, expr, dest):
+        operator = self.logicOps[expr.__class__]
+        res = []
+        if operator == "!":            
+            res.extend(self.expression(expr.expr, dest))
+            res.append("not %s, %s" % (dest,dest))
+        else:
+            L,R = expr.nodes
+            tmp = self.symbol("tmp")
+            res.append(".local PerlNum %s" % tmp)
+            res.extend(self.expression(L, dest))
+            res.extend(self.expression(R, tmp))
+            res.append("%s %s, %s, %s" % (operator, dest, dest, tmp))
+        return res
 
     ##[ visitor methods ]##########################################
         

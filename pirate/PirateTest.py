@@ -164,6 +164,17 @@ class PirateTest(unittest.TestCase):
                 print num,
             """, dump=0)
         self.assertEquals(res, "4 5 4 5 ")
+
+
+    def test_logic(self):
+        res = run(
+            """
+            print 'cat' or 'mouse',
+            if not (1 and 0): print 'and',
+            print 'cat' and 'mouse',
+            """, dump=0)
+        self.assertEquals(res, "cat and mouse ")
+        
            
                                                                     
 if __name__=="__main__":
