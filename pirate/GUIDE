@@ -27,13 +27,35 @@ INSTALLATION
    run the tests:
 
 
+############################
+
+COMPILING THE BUILTIN MODULE
+
+############################
+
+
+   Pirate currently requires a precompiled version
+   of the python __builtin__ module. The tests won't
+   run without it, but pirate.py will generate it if
+   it's not there. So the first thing you should do
+   is run this:
+
+   % python pirate.py benchmarks/euclid.py
+   96 64
+   32
+
+   (It doesn't matter what file you run, euclid was
+   just handy, and shows that pirate really works!)
+
+
+
 #################
 
 RUNNING THE TESTS
 
 #################
 
-   The first thing to do (once you have parrot and pirate installed)
+   The next thing to do (once you have parrot and pirate installed)
    is run the tests. If everything is working, it looks like this:
 
    % python PirateTest.py
