@@ -1,0 +1,206 @@
+# $Id$
+
+		      THE PIRATE GUIDE
+		(how to understand the code)
+
+
+
+#################
+
+RUNNING THE TESTS
+
+#################
+
+   The first thing to do is run the tests. If everything
+   is working, it looks like this:
+
+   % python PirateTest.py
+   ................
+   ------------------------------------
+   Ran 16 tests in 0.445s
+
+   OK
+
+
+   (where 16 is however many tests there are)
+
+   If it's not working on a fresh install, something
+   has probably changed in imcc or the parrot VM. 
+   probably changed out from under us. Either 
+   that or someone checked in code that didn't 
+   pass the tests. (Or it could mean your python is
+   out of date - I'm developing against 2.2; 2.3 is
+   the latest)
+
+   Anyway, hopefully it's working and we can move on. :)
+
+   Now look inside PirateTest.py ... You'll see there's
+   a utility function called trim() (nice for indenting 
+   multi-line strings in python code) and then a class 
+   called PirateTest with a bunch of test_xyz methods. 
+
+   Each of these methods calls self.run() on a chunk of
+   python code. run() compiles it and invokes parrot
+   to see what the code does. Then we make an assertion
+   about what the result should be. If the assertion holds
+   up, we get a dot when we run the tests. If it fails,
+   we'll see why. For example, if I break test_print so
+   that it looks like this:
+
+    def test_print(self):
+        res = self.run(
+            """
+            print 'hello,',
+            print 'world!'
+            """)
+        self.assertEquals(res, "it's broke!\n")
+
+   Then the tests show this instead:
+
+
+..............F.
+======================================================================
+FAIL: test_print (__main__.PirateTest)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "PirateTest.py", line 47, in test_print
+    self.assertEquals(res, "it's broken!\n")
+  File "/usr/local/lib/python2.2/unittest.py", line 286, in failUnlessEqual
+    raise self.failureException, \
+AssertionError: 'hello, world!\n' != "it's broken!\n"
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.443s
+
+FAILED (failures=1)
+
+
+    Yuck. So keep the tests running! :)
+
+
+
+####################################
+
+THE PIRATE CODE GENERATOR FOR PYTHON
+
+####################################
+
+    Because so many languages have similar control structures,
+    the plan is to eventually have a generic compiler for parrot 
+    that compiler for other languages can use can talk to. But 
+    for now, the compiler is python-specific.
+
+    If you open pirate.py and scroll through, you will see that
+    most of the file is one huge class called PirateVisitor and
+    it has a bunch of visitXxxxx and yyyyExpression methods.
+
+    This class is meant to be used by the python compiler package.
+    If you look at the compile() function near the bottom of the
+    file, you will see that the python parser returns a tree-like
+    structure (called "ast" for abstract syntax tree) and that 
+    once we have it, we instantiate a PirateVisitor to walk 
+    through the tree.
+
+             NOTE: See Klaas-Jan Stol's report for an in-depth look
+                   at how parsers and ASTs and compilers in general
+                   work. His report is about Lua->Parrot but most of it 
+                   applies to python too:
+
+                   http://members.home.nl/joeijoei/parrot/report.pdf
+
+
+    So basically, we're letting the python parser and compiler 
+    packages do all the work of building the AST. Then we use a
+    compiler.visitor.ASTVisitor to walk the tree and call the 
+    appropriate methods on a PirateVisitor instance, and the
+    PirateVisitor builds up an list of strings. Each string in the
+    list is a line of IMC that parrot can understand.
+
+
+    The visitXxxx methods correspond to statements and control
+    structures in the python language. Each of these contains a
+    template of the IMC to be generated for that language feature.
+
+
+    For example, you can see that visitPrint sets up the IMC to 
+    call a __py__print routine (which is written in IMC and found
+    in the file pirate.imc )... 
+
+
+    The visitWhile is slightly more complex, and is a template for
+    a while loop.
+
+    Currently there's a lot of list-appending and string interpolation
+    going on, so these templates can be a little hard to read. It
+    might help to just try it out. Create a simple python file like
+    this:
+
+            while 1:
+               pass
+
+    Save it as while.py and run this:
+
+    ./pirate.py -d while.py
+
+    The -d option tells pirate to dump out the source code. Unless
+    visitWhile() has been improved, this should print:
+
+        .sub __main__
+            setline 1
+        while00001:
+            $P00001 = new PerlInt
+            $P00001 = new PerlInt
+            $P00001 = 1
+            unless $P00001 goto endwhile00001
+            noop
+            goto while00001
+        endwhile00001:
+            end
+        .end
+
+
+     (The extra "new" is a bug, and yes, we're using PerlInt for now.)
+
+     You'll notice there's a lot of 00001's in there. That's a 
+     product of PirateVisitor.symbol(), which appends a unique
+     number to a string so we don't get a bunch of symbol 
+     clashes in code we pass to IMC.  (No good saying "goto endwhile"
+     if there's 50 while loops in the code)
+
+
+     BTW, you can also dump the code that each of the test cases uses. 
+     You'll notice that most of the tests say dump=0. Change the 0 to
+     1 and you'll see the code. The other parameter, lines, will show
+     line numbers for the IMC code -- helpful if imcc gives you a nasty
+     message about something on line 23. :)
+
+
+     Okay, the other major thing to look at in PirateVisitor is the 
+     expression() and various .xxxxExpression() methods. 
+
+
+     As the expression() docstring explains, standard python uses
+     a stack-based machine, so the standard bytecode just push and
+     pop values on and off a stack. In pirate, we use registers
+     instead, so when we visit an expression we have to pass in
+     a destination register, telling parrot where to store the 
+     value. The expression() method takes care of this, and you'll
+     notice these methods all have a "dest" parameter.
+
+
+     About the only other tricky thing right now is PirateSubVisitor. 
+     This is actually just a subclass of PirateVisitor, so it can
+     do anything the normal visitor does. The only difference is that
+     when .genCode() (which returns the IMC code) finally gets called,
+     it adds some code to handle the parrot calling conventions.
+
+     PirateSubVisitor is only used for lambdas (and once implemented,
+     for subroutine and method defintions). The main PirateVisitor
+     collects the subroutine code in a separate list called self.subs.
+
+
+
+     Anyway, that's all for now. Hopefully it'll  get you started 
+     working with Pirate. :)
+
+
