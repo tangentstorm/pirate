@@ -1139,11 +1139,7 @@ class PirateSubVisitor(PirateVisitor):
         self.lines.extend(code)
 
         if fallthrou:
-            none = self.gensym()
-            type = self.gensym("$I")
-            self.append('find_type %s, "PyNone"' % type)
-            self.append("%s=new %s" % (none,type))
-            self.append(".return (%s)" % none)
+            self.append(".return (%s)" % self.lookupName("None"))
         self.append(".end", indent=False)
         self.append("")
         return "\n".join(self.lines)
