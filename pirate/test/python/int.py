@@ -27,7 +27,7 @@ print "__mod__", a.__mod__(b), a % b
 print "__mul__", a.__mul__(b), a * b
 print "__neg__", a.__neg__(), - a
 # print "__new__", a.__new__(b)
-print "__nonzero__", a.__nonzero__()
+print "__nonzero__", bool(a.__nonzero__())
 print "__oct__", a.__oct__(), oct(a)
 print "__or__", a.__or__(b), a | b
 print "__pos__", a.__pos__(), +a

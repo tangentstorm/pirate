@@ -75,7 +75,7 @@ class PirateTest(unittest.TestCase):
             del C.x
             print C.x
             """)
-        self.assertEquals(res, "1\nAttributeError: x\n")
+        self.assertEquals(res, "1\nAttributeError: C instance has no attribute 'x'\n")
 
     def test_del_key(self):
         res = self.run(
@@ -85,7 +85,7 @@ class PirateTest(unittest.TestCase):
             del d['a']
             print d['a']
             """)
-        self.assertEquals(res, "b\nKeyError: a\n")
+        self.assertEquals(res, "b\nKeyError: 'a'\n")
 
 
     ## amk's example program #####################
@@ -135,18 +135,20 @@ class PirateTest(unittest.TestCase):
         res = self.run(
             """
             try:
-                print '1',
-                raise hell
-                print '2',
-            finally:
-                print '3',
-
-            try:
-                print '4',
-            finally:
-                print '5',
+                try:
+                    print '1',
+                    raise hell
+                    print '2',
+                finally:
+                    print '3',
+                print '4'
+            except: 
+                try:
+                    print '5',
+                finally:
+                    print '6',
             """)
-        self.assertEquals(res, "1 3 4 5")
+        self.assertEquals(res, "1 3 5 6")
 
     def test_clear_eh(self):
         res = self.run(
