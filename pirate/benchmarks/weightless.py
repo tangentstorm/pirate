@@ -43,7 +43,7 @@ ticks = 0
 while ticks < 100000:
     ticks = ticks + 1
     for gen in threads:
-        PARROT_INLINE("save list0")  # workaround for parrot bug
+        PARROT_INLINE("save list0")  # workaround for pirate (parrot?) bug
         name, count = gen.next()
         PARROT_INLINE("restore list0")
 t2 = time()
