@@ -44,7 +44,7 @@ print "__rlshift__", c.__rlshift__(a), a << 2
 print "__rmod__", a.__rmod__(b),  b % a
 print "__rmul__", a.__rmul__(b), b * a
 print "__ror__", a.__ror__(b), b | a
-# print "__rpow__", c.__rpow__(a), a ** 2
+print "__rpow__", c.__rpow__(a), a ** 2
 print "__rrshift__", c.__rrshift__(a), a >> 2
 print "__rshift__", a.__rshift__(2), a >> 2
 print "__rsub__", a.__rsub__(b), b - a

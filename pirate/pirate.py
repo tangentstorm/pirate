@@ -99,7 +99,7 @@ class PirateVisitor(object):
         if type in self.types:
             return self.types[type]
         index = self.gensym("$I")
-        self.append('find_type %s, "%s"' % (index,type))
+        self.append("find_type %s, '%s'" % (index,type))
         self.types[type] = index
         return index
 
@@ -422,12 +422,7 @@ class PirateVisitor(object):
         rside = self.compileExpression(node.right, allocate=-1)
         
         op = self.infixOps[node.__class__]
-        if op == "**":
-            if rside.isdigit():
-                rside = self.compileExpression(node.right, allocate=1)
-            self.append("%s = %s.__pow__(%s)" % (dest, lside, rside))
-        else:
-            self.append("%s = %s %s %s" % (dest, lside, op, rside))
+        self.append("%s = %s %s %s" % (dest, lside, op, rside))
 
         # put the result in our destination
         # (imcc seems to like this as a separate step
@@ -611,8 +606,12 @@ class PirateVisitor(object):
             sub = sub + ".__call__"
             args = [argx,keyx]
 
-        dest = self.gensym()
-        self.append("%s=%s(%s)" % (dest,sub,",".join(args)))
+        if allocate>-2:
+            dest = self.gensym()
+            self.append("%s=%s(%s)" % (dest,sub,",".join(args)))
+        else:
+            dest = ''
+            self.append("%s(%s)" % (sub,",".join(args)))
 
         self.locals = {}
         return dest
@@ -642,7 +641,7 @@ class PirateVisitor(object):
         pir = PirateSubVisitor(sub,
                                depth = self.depth+1,
                                doc=comment,
-                               counter = self.counter,
+                               counter = None, # self.counter,
                                vars = self.vars,
                                args=node.argnames)
 
@@ -995,7 +994,7 @@ class PirateVisitor(object):
     def visitCallFunc(self, node):
         # visited when a function is called as a subroutine
         # (not as part of a larger expression or assignment)
-        self.callingExpression(node, allocate=0)
+        self.callingExpression(node, allocate=-2)
 
     def visitDiscard(self, node):
         #import pdb; pdb.set_trace()
@@ -1058,19 +1057,22 @@ class PirateVisitor(object):
         assert len(node.handlers)==1, "@TODO: only one handler for now"
         assert not node.else_, "@TODO: try...else not implemented"
         catch = self.genlabel("catch")
-        handler = self.gensym()
         endtry = self.genlabel("endtry")
-        self.append("newsub %s, .Exception_Handler, %s" \
-                    % (handler, catch))
-        self.append("set_eh " + handler)
+        self.append("push_eh " + catch)
         self.visit(node.body)
         self.append("clear_eh")
         self.goto(endtry)
         self.label(catch)
         for hand in node.handlers:
             expr, target, body = hand
-            assert not (expr or target), \
-                   "@TODO: can't get exception object yet"
+            if expr:
+                expr = self.compileExpression(expr) + ".__match__(P5)"
+                if target:
+                    tmp = self.gensym()
+                    self.append("%s = %s" % (tmp,expr))
+                    self.assign(target,tmp)
+                else:
+                    self.append(expr)
             self.visit(body)
         self.label(endtry, optional=True)
 
@@ -1124,7 +1126,7 @@ class PirateSubVisitor(PirateVisitor):
         # self.locals = vars
         for (i,arg) in enumerate(self.args):
             self.locals[arg] = "P%d" % (i+5)
-        self.counter = counter
+        self.counter = counter or {}
         self.depth = depth
         self.globals = []
         self.isGenerator = 0
@@ -1248,8 +1250,8 @@ def compile(src, name="__main__"):
     pir = PirateVisitor(name)
     vis.preorder(ast, pir)
     if name=="__main__":
-        pre  = ['    loadlib P1, "python_group"',
-                '    find_global P0, "PyBuiltin", "__load__"',
+        pre  = ["    loadlib P1, 'python_group'",
+                "    find_global P0, 'PyBuiltin', '__load__'",
                 "    invoke",
                 "    push_eh __py_catch"]
         post = ["    .return ()",
