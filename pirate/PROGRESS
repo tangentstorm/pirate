@@ -13,16 +13,20 @@ y visitAssign:
 y visitBreak:
 y visitCallFunc:
 y visitContinue:
-y visitFor: # no "else" clause yet
+y visitFor:      # no "else" clause yet
 y visitIf:
 y visitLambda:
 y visitList:
-y visitPrint(self, node, newline=0):
+y visitPrint:
 y visitPrintnl:
 y visitReturn:
-y visitWhile: # no "else" clause yet
+y visitWhile:    # no "else" clause yet
 y visitPass:
 y visitFunction: # no */** args yet
+y visitTuple:    # but makes a list for now
+y visitAssTuple: in visitAssign
+y visitAssList:  in visitAssign
+
 
 # e just means it was done in the expression() method
 # instead of its own visitXXX()
@@ -42,6 +46,9 @@ e visitSub:
 
 ## not done yet #################################
 
+## global ################
+n visitGlobal:  need to tag somehow? (symbols.SymbolVisitor?)
+
 ## operators #############
 n visitBackquote:
 n visitBitand:
@@ -57,12 +64,6 @@ n visitFloorDiv:
 n visitInvert:
 
 
-## tuples ################
-# (will treat as lists for now.)
-n visitAssTuple:
-n visitTuple:
-
-
 ## dictionaries ##########
 n visitDict:
 n visitSubscript(self, node, aug_flag=None):
@@ -70,7 +71,6 @@ n visitKeyword: keyword arguments (on calling side)
 
 
 ## assignments ###########
-n visitAssList:
 n visitAssName:
 n visitAugAssign:
 n visitAugName(self, node, mode):
@@ -91,10 +91,6 @@ n visitTryFinally:
 n visitRaise:
 
 
-## global ################
-n visitGlobal:  need to tag somehow? (symbols.SymbolVisitor?)
-
-
 ## generators ############
 n visitYield:
 n closures (return function/lambda)
@@ -110,10 +106,9 @@ n visitListCompIf(self, node, branch):
 n visitSlice(self, node, aug_flag=None):
 n visitSliceobj:
 n visitAugSlice(self, node, mode):
-n visitEllipsis: extended slices (for Numeric, 2.3, etc)
 
 
-## .Eval #################
+## Eval ##################
 n visitExec:
 n visitFrom:
 n visitImport:
@@ -126,3 +121,9 @@ n visitDiscard: (for free expressions, eg: "cout << 5")
 
 ## not applicable ####################
 u visitTest: used in pycodegen.py for visitAnd/visitOr
+
+
+## will not be supported #############
+- imaginary/complex numbers (2j) (because parser can't handle it)
+- visitEllipsis: extended slices (for Numeric, 2.3, etc)
+

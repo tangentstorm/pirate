@@ -63,9 +63,10 @@ class PirateTest(unittest.TestCase):
             """
             a = 1
             b, c = 2, 3
-            print a, b, c
+            [d,e] = 'f', 'g'
+            print a, b, c, d, e
             """)
-        self.assertEquals(res, "1 2 3\n")
+        self.assertEquals(res, "1 2 3 f g\n")
 
 
     def test_simplemath(self):
@@ -112,12 +113,23 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "96 64\n32\n")
 
 
+    ## data structures ##############################
+
     def test_list(self):
         res = self.run(
             """
             print [], [1], [1,2,3], [[],[4],[]]
             """)
         self.assertEquals(res, "[] [1] [1, 2, 3] [[], [4], []]\n")
+
+    def test_tuple(self):
+        #@TODO: make tuples be tuples once there's a .PythonTuple
+        res = self.run(
+            """
+            print (1,2,(3,4),5)            
+            """)
+        self.assertEquals(res, "[1, 2, [3, 4], 5]\n")
+        
     
     def test_for(self):
         res = self.run(
@@ -277,6 +289,5 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "15 1\n")
 
 
-        
 if __name__=="__main__":
     unittest.main()

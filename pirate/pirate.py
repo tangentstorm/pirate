@@ -114,6 +114,7 @@ class PirateVisitor(object):
             # old style (return nothing)
             ast.Name:     self.nameExpression,
             ast.List:     self.listExpression,
+            ast.Tuple:    self.listExpression, # tuples ares lists for now
             ast.Lambda:   self.lambdaExpression,
             ast.CallFunc: self.callingExpression,
             ast.Compare:  self.compareExpression,
@@ -444,12 +445,17 @@ class PirateVisitor(object):
     def visitAssign(self, node):
         leftside = node.nodes[0]
         rightside = node.expr
-        if isinstance(leftside, ast.AssTuple):
+        if isinstance(leftside, ast.AssTuple) \
+        or isinstance(leftside, ast.AssList):
             leftside = leftside.nodes
             rightside = rightside.nodes
-        else:
+        elif isinstance(leftside, ast.AssName):
             leftside = [leftside]
             rightside = [rightside]
+        else:
+            raise NotImplementedError, \
+                  "don't how to handle %s" % node.__class__.__name__
+            
         for node, expr in zip(leftside, rightside):
             name = node.name
 
