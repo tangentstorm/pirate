@@ -135,7 +135,7 @@ class PirateTest(unittest.TestCase):
     def test_raise(self):
         res = self.run(
             """
-            print 'to be or ',
+            print 'to be or',
             raise 'not to be'
             print 'what was the question?'
             """, dump=0)

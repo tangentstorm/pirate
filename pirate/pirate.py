@@ -439,8 +439,8 @@ class PirateVisitor(object):
         "==": "iseq",
         ">":  "isgt",
         ">=": "isge",
-        "is": "==",
-        "is not": "!=",
+        "is": "iseq",
+        "is not": "isne",
     }
 
     def unlessExpression(self, test, label):
@@ -1036,12 +1036,21 @@ class PirateVisitor(object):
 
     def visitRaise(self, node):
         assert node.expr1, "argument required for raise"
-        assert not (node.expr2 or node.expr3), "only 1 arg alllowed for raise"
+        assert not (node.expr3), "only 3 arg raises not supported"
         self.set_lineno(node)
-        msg = self.compileExpression(node.expr1)
+
         exceptsym = self.gensym()
-        self.append("new %s, .Exception" % exceptsym)
-        self.append('%s["_message"] = %s' % (exceptsym, msg))
+
+        if node.expr2:
+            type = self.compileExpression(node.expr1)
+            obj  = self.compileExpression(node.expr2)
+            self.append("%s = %s()" % (exceptsym, type))
+            self.append("setref %s, %s" % (exceptsym,obj))
+        else:
+            msg = self.compileExpression(node.expr1)
+            self.append("new %s, .Exception" % exceptsym)
+            self.append('%s["_message"] = %s' % (exceptsym, msg))
+
         self.append("throw %s" % exceptsym)
 
     def visitAssert(self, node):
