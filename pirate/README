@@ -1,22 +1,108 @@
-# py...rrot 
+# $Id$
 
-Pirate is Michal's attempt at a python
-compiler for parrot.
+pirate (python on parrot)
 
-It's loosely based on amk's parrot-gen.py:
+
+## status #########################################
+
+Pirate is an attempt by Michal Wallace (with tons
+of advice from the parrot crew on perl6-internals) 
+get python running on a parrot virtual machine.
+
+It was originally based on amk's parrot-gen.py:
 
    http://www.amk.ca/conceit/parrot.html
 
-The main differences so far:
+But has been extended considerably and updated
+to work with the new intermediate code compiler
+(imcc). Currently, pirate supports:
 
-   - pirate uses imcc instead of assemble.pl
-   - pirate is backed by unit tests
+    - print
+    - lists, strings, ints (but no methods on them)
+    - assignment and multi-assignment ( x,y=1,2 )
+    - while, for, if/elif/else, break, continue
+    - math operations (+, -, *, /, %)
+    - boolean logic (and, or, not)
+    - comparison operators
+    - lambda
 
-   - but parrot-gen implements lot more.
 
-I'm actually stealing code bit by bit from
-parrot-gen.py and incorporating it into 
-pirate. This is my first compiler and my
-first attempt at using python parse trees,
-so I figured I'd go slow and test first. :)
+## to-do list #####################################
+
+    - parrot calling convention for functions
+    - def
+    - list comprehensions
+    - yield
+    - proper scoping
+    - dict
+    - simple exceptions
+    - raise, assert
+    - try...except # if possible yet
+    - class
+    - import
+    - ??
+
+
+## help wanted ####################################
+    
+    - bug reports! :)
+    - anything on the above list
+    - __builtin__ routines
+    - standard library (hopefully w/help from pypython?)
+    - run C modules from parrot's native call interface 
+      PMCs are sead to be very similar to PyObjects. 
+      It would be awesome if things like Numeric, 
+      pygame, etc could "just work" somehow... :)
+    - optimization of generated code
+
+
+
+## cvs access ####################################
+
+To get the code:
+
+ cvs -d:pserver:anonymous@versionhost.com:/cvs/pirate login
+ [no password]
+ cvs -d:pserver:anonymous@versionhost.com:/cvs/pirate co pirate
+
+ 
+If you want write access to cvs, drop me an email at 
+michal@sabren.com
+
+
+
+## running ########################################
+
+To (attempt to) run a python script through parrot:
+
+    pirate.py whatever.py
+
+To see the generated parrot code:
+
+    pirate.py -d whatever.py
+
+
+
+## pair programming? ##############################
+
+I'd also love to do some pair programming on this. If anyone's
+interested, let me know and we can meet up online and share
+a terminal session on my server. Just let me know! :)
+
+
+
+## test first! ####################################
+
+This code is being written test-first. Don't break
+the tests, and don't check in any code that doesn't
+have a test case. Tests go in PirateTest.py and to
+test, just do this:
+
+    python PirateTest.py
+
+Note the run() function has two keyword arguments: 
+dump=0 and lines=1. Set dump to 1 to show the 
+generated code for a test, set lines to 0 to hide
+the line numbers (in case you want to pipe it
+to an *.imc file to play around with manually).
 
