@@ -1,7 +1,9 @@
+# $Id$
+#
 # python generation progress.
 # goal is to re-implement compiler/pycodegen.py
 # so we need to reimplement all these methods:
-# $Id$
+#
 
 # export DONE=`grep -E "^[ye]" PROGRESS | wc -l`
 # export TOTAL=`grep -E "^[yehn]" PROGRESS | wc -l`
@@ -11,20 +13,20 @@ y visitAssign:
 y visitBreak:
 y visitCallFunc:
 y visitContinue:
-y visitFor:
+y visitFor: # no "else" clause yet
 y visitIf:
 y visitLambda:
 y visitList:
 y visitPrint(self, node, newline=0):
 y visitPrintnl:
 y visitReturn:
-y visitWhile: # no else clause yet
+y visitWhile: # no "else" clause yet
 y visitPass:
-y visitFunction: # no recursion/closures/nesting yet
-
+y visitFunction: # no closures or */** args yet
 
 # e just means it was done in the expression() method
 # instead of its own visitXXX()
+e visitExpression: 
 e visitAdd:
 e visitAnd:
 e visitCompare:
@@ -39,53 +41,88 @@ e visitSub:
 
 
 ## not done yet #################################
-n visitAssAttr:
-n visitAssList:
-n visitAssName:
-n visitAssName:
-n visitAssTuple:
-n visitAssert:
-n visitAugAssign:
-n visitAugGetattr(self, node, mode):
-n visitAugName(self, node, mode):
-n visitAugSlice(self, node, mode):
-n visitAugSubscript(self, node, mode):
+
+## operators #############
 n visitBackquote:
 n visitBitand:
 n visitBitor:
 n visitBitxor:
-n visitClass:
-n visitDict:
-n visitExec:
-n visitFrom:
-n visitGetattr:
-n visitGlobal:
-n visitImport:
-n visitLeftShift:
-n visitListComp:
-n visitListCompFor:
-n visitListCompIf(self, node, branch):
-n visitModule:
 n visitPower:
-n visitRaise:
+n visitLeftShift:
 n visitRightShift:
-n visitSlice(self, node, aug_flag=None):
-n visitSliceobj:
-n visitTryExcept:
-n visitTryFinally:
-n visitTuple:
 n visitUnaryAdd:
 n visitUnaryInvert:
 n visitUnarySub:
-n visitYield:
+n visitFloorDiv:
+n visitInvert:
 
-## not sure what these mean ####################
-# (haven't looked at the code yet)
-u visitDiscard:
-u visitEllipsis:
-u visitExpression:
-u visitFloorDiv:
-u visitInvert:
-u visitKeyword:
-u visitSubscript(self, node, aug_flag=None):
-u visitTest:
+
+## tuples ################
+# (will treat as lists for now.)
+n visitAssTuple:
+n visitTuple:
+
+
+## dictionaries ##########
+n visitDict:
+n visitSubscript(self, node, aug_flag=None):
+n visitKeyword: keyword arguments (on calling side)
+
+
+## assignments ###########
+n visitAssList:
+n visitAssName:
+n visitAugAssign:
+n visitAugName(self, node, mode):
+n visitAugSubscript(self, node, mode):
+
+
+## o-o stuff #############
+n visitClass:
+n visitAssAttr:
+n visitAugGetattr(self, node, mode):
+n visitGetattr:
+
+
+## exceptions ############
+n visitAssert:
+n visitTryExcept:
+n visitTryFinally:
+n visitRaise:
+
+
+## global ################
+n visitGlobal:  need to tag somehow? (symbols.SymbolVisitor?)
+
+
+## generators ############
+n visitYield:
+n closures (return function/lambda)
+
+
+## list comprehensions ###
+n visitListComp:
+n visitListCompFor:
+n visitListCompIf(self, node, branch):
+
+
+## slices ################
+n visitSlice(self, node, aug_flag=None):
+n visitSliceobj:
+n visitAugSlice(self, node, mode):
+n visitEllipsis: extended slices (for Numeric, 2.3, etc)
+
+
+## .Eval #################
+n visitExec:
+n visitFrom:
+n visitImport:
+n visitModule: 
+
+
+## expressions ###########
+n visitDiscard: (for free expressions, eg: "cout << 5")
+
+
+## not applicable ####################
+u visitTest: used in pycodegen.py for visitAnd/visitOr
