@@ -53,6 +53,14 @@ class PirateTest(unittest.TestCase):
             gotError = 1
         assert gotError, "should get unpack sequence wrong size ValueError"
             
+    def test_unpack_empty_list(self):
+        res = self.run(
+            """
+            a = []
+            print a
+            """, dump=0)
+        self.assertEquals(res, "[]\n")
+            
 
     def test_unpack_non_sequence(self):
         try:
@@ -603,7 +611,18 @@ class PirateTest(unittest.TestCase):
             """, dump=0)
         self.assertEquals(res, "1\n")
 
-    
+
+    ## PARROT_INLINE ##################################
+
+    def test_PARROT_INLINE(self):
+        res = self.run(
+            """
+            PARROT_INLINE(
+                r'S0 = "cat\\n"',
+                r'print S0'
+            )
+            """, dump=0)
+        self.assertEquals(res, 'cat\n')
 
 
 if __name__=="__main__":

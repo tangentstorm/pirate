@@ -676,6 +676,10 @@ class PirateVisitor(object):
             for node, expr in zip(lside, rside):
                 self.assign(node, self.evaluate(expr))
 
+        elif len(rside)==0:
+            # eg, x = []
+            self.assign(lside[0], self.evaluate(node.expr))
+
         elif len(rside)==1:
             ## this handles l,l,l=r and l,l,l=r()
             rside = rside[0]
@@ -806,6 +810,25 @@ class PirateVisitor(object):
         # visited when a function is called as a subroutine
         # (not as part of a larger expression or assignment)
         self.callingExpression(node, dest=None, allocate=0)
+
+    def visitDiscard(self, node):
+        #import pdb; pdb.set_trace()
+        # PARROT_INLINE is a special macro for inling parrot code
+        try:
+            nevermind = 1
+            name = node.expr.node.name
+            if name == "PARROT_INLINE":
+                nevermind = 0
+        except:
+            pass
+
+        if nevermind:
+            self.visit(node.expr)
+        else:
+            for line in node.expr.args:
+                assert isinstance(line, ast.Const), "can only INLINE strings"
+                self.append(line.value)
+            
 
     def visitPass(self, node):
         self.append("noop")
