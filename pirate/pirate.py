@@ -240,7 +240,6 @@ class PirateVisitor(object):
         # parrotclass.getprop returns PyNone if not present so:
         endCheck = self.genlabel("endCheck")
         self.append("typeof $S0, %s" % what)
-        #self.append("print $S0")
         self.append("unless $S0 == 'PyNone' goto %s" % endCheck)
         ex = ast.Raise(ast.Const(error), None, None)
         self.visit(ex)
@@ -570,16 +569,13 @@ class PirateVisitor(object):
     def visitPrint(self, node):
         assert node.dest is None, "@TODO: print >> not yet handled"
         for n in node.nodes:
-            arg = self.compileExpression(n, allocate=1)
-            self.append("__py__print(%s,0)" % arg)
-            self.append("print ' '")
+            arg = self.compileExpression(n)
+            self.append("print_item %s" % arg)
             
 
     def visitPrintnl(self, node):
         self.visitPrint(node)
-        if node.nodes:
-            self.unappend() # remove final space
-        self.append('print "\\n"')
+        self.append('print_newline')
 
 
     def visitIf(self, node):

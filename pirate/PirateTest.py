@@ -83,21 +83,21 @@ class PirateTest(unittest.TestCase):
             """
             class C: pass
             C.x = 1
-            print C.x,
+            print C.x
             del C.x
             print C.x
             """, dump=0)
-        self.assertEquals(res, "1 AttributeError: x\n")
+        self.assertEquals(res, "1\nAttributeError: x\n")
 
     def test_del_key(self):
         res = self.run(
             """
             d = {'a':'b'}
-            print d['a'],
+            print d['a']
             del d['a']
             print d['a']
             """, dump=0)
-        self.assertEquals(res, "b KeyError: a\n")
+        self.assertEquals(res, "b\nKeyError: a\n")
 
 
     ## amk's example program #####################
@@ -135,7 +135,7 @@ class PirateTest(unittest.TestCase):
     def test_raise(self):
         res = self.run(
             """
-            print 'to be or',
+            print 'to be or ',
             raise 'not to be'
             print 'what was the question?'
             """, dump=0)
@@ -158,7 +158,7 @@ class PirateTest(unittest.TestCase):
             finally:
                 print '5',
             """, dump=0)
-        self.assertEquals(res, "1 3 4 5 ")
+        self.assertEquals(res, "1 3 4 5")
 
     def test_clear_eh(self):
         res = self.run(
