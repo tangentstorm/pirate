@@ -203,7 +203,7 @@ class PirateTest(unittest.TestCase):
             """
             f = lambda x: x+1
             print f(4), f(5)
-            """, dump=0, lines=1)
+            """, dump=0, lines=0)
         self.assertEquals(res, "5 6\n")
 
         
@@ -262,6 +262,19 @@ class PirateTest(unittest.TestCase):
             f(1)
             """, dump=0, lines=0)
         self.assertEquals(res, "1 0 ")
+
+    def test_scope(self):
+        res = self.run(
+            """
+            x = 1
+            def make_adder(base):
+                def adder(x):
+                    return base+x
+                return adder
+            h = make_adder(10)
+            print h(5), x
+            """, dump=0, lines=0)
+        self.assertEquals(res, "15 1\n")
 
 
         

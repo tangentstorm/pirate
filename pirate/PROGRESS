@@ -22,7 +22,7 @@ y visitPrintnl:
 y visitReturn:
 y visitWhile: # no "else" clause yet
 y visitPass:
-y visitFunction: # no closures or */** args yet
+y visitFunction: # no */** args yet
 
 # e just means it was done in the expression() method
 # instead of its own visitXXX()

@@ -47,7 +47,7 @@ class PirateVisitor(object):
 
     ##[ management stuff ]##########################################
     
-    def __init__(self, name, counter=None):
+    def __init__(self, name, counter=None, depth=None):
         self.name = name
         self._last_lineno = None
         self.lines = imclist()
@@ -55,6 +55,7 @@ class PirateVisitor(object):
         self.counter = counter or {}
         self.subs = []
         self.vars = {}
+        self.depth = depth or 0 # lexical scope depth
 
     def symbol(self, prefix):
         """
@@ -66,7 +67,7 @@ class PirateVisitor(object):
 
     def getCode(self):
         res  = ".sub %s\n" % self.name
-        res += "    new_pad 0\n"
+        res += "    new_pad %s\n" % self.depth
         res += "\n".join(self.lines) + "\n"
         res += ".end\n"
         res += ".include 'pirate.imc'\n\n"
@@ -158,7 +159,10 @@ class PirateVisitor(object):
 
 
     def nameExpression(self, expr, dest):
-        self.append("%s = %s" % (dest, expr.name))
+        if expr.name in self.vars:
+            self.append("find_lex %s, '%s'" % (dest, expr.name))
+        else:
+            self.append("%s = %s" % (dest, expr.name))
 
 
     def listExpression(self, expr, dest):
@@ -362,8 +366,10 @@ class PirateVisitor(object):
         # fork a new code generator to walk the function's tree:
         vis = compiler.visitor.ASTVisitor()
         pir = PirateSubVisitor(sub,
+                               depth = self.depth+1,
                                doc=comment,
                                counter = self.counter,
+                               vars = self.vars,
                                args=node.argnames)
 
         # lambda is really just a single return function:
@@ -375,9 +381,10 @@ class PirateVisitor(object):
         self.subs.append(pir)
 
         # store the address in dest
-        self.append("newsub %s, .Sub, %s" % (ref, sub))
+        self.append("newsub %s, .Closure, %s" % (ref, sub))
         if allocate:
             self.append("store_lex -1, '%s', %s" % (dest, ref))
+            self.vars[dest] = dest
         else:
             self.append("%s = %s" % (dest, ref))
 
@@ -445,8 +452,14 @@ class PirateVisitor(object):
             rightside = [rightside]
         for node, expr in zip(leftside, rightside):
             name = node.name
-            self.append(".local object %s" % name)
-            self.compileExpression(expr, name)
+
+            #@TODO: get rid of local object nonsense here...
+            if isinstance(expr, ast.Lambda):
+                self.compileExpression(expr, name)
+            else:
+                self.append(".local object %s" % name)
+                self.compileExpression(expr, name)
+                self.append("store_lex -1, '%s', %s" % (name,name))
 
 
     def visitWhile(self, node):
@@ -527,6 +540,7 @@ class PirateVisitor(object):
         _res= self.symbol("res")
         self.append(".local object %s" % _res)
         self.compileExpression(node.value, _res)
+        self.append("pop_pad")
         self.append(".pcc_begin_return")
         self.append(".return %s" % _res)
         self.append(".pcc_end_return")
@@ -548,11 +562,15 @@ class PirateSubVisitor(PirateVisitor):
     work on subroutines instead of whole
     programs.
     """
-    def __init__(self, name, doc, counter, args=[]):
+    def __init__(self, name, depth, doc, counter, vars, args=[]):
         super(PirateSubVisitor, self).__init__(name, counter=counter)
         self.doc = doc
         self.args = args
+        self.vars = vars
+        for arg in self.args:
+            self.vars[arg]=arg
         self.counter = counter
+        self.depth = depth
     def getCode(self):
         res = ""
         if self.doc:
@@ -560,8 +578,12 @@ class PirateSubVisitor(PirateVisitor):
         res  += ".pcc_sub %s non_prototyped\n" % self.name
         for arg in self.args:
             res += "    .param object %s\n" % arg
+        res += "    new_pad %s\n" % self.depth
+        for arg in self.args:
+            res += "    store_lex -1, '%s', %s\n" % (arg,arg)
         res += "\n".join(self.lines) + "\n"
-        res += ".end\n"
+        res += ".end\n\n"
+        res += "\n\n".join([s.getCode() for s in self.subs])
         return res
         
 ## module interface ###############################################
