@@ -1,0 +1,43 @@
+.sub _main
+  .local int zero
+  .local int i
+  i=5
+  newsub $P0, .Coroutine, _addtwo
+  newsub $P1, .Continuation, after_loop
+  .pcc_begin prototyped
+  .arg $P1
+  .arg i
+  .pcc_call $P0
+ ret_addr:
+  .result $I2
+  .pcc_end
+    zero = 0
+    print $I2
+    print "\n"
+    savetop
+    invoke
+    goto ret_addr
+    restoretop
+ after_loop:
+  print "done in main\n"
+  end
+.end
+
+.pcc_sub _addtwo
+  .param Continuation when_done
+  .param int a
+  .local int i
+  i = 0
+ loop:
+    if i >= 10 goto done
+    $I5 = a+i
+    .pcc_begin_yield
+    .return $I5
+    .pcc_end_yield
+    i = i + 1
+    goto loop
+ done:
+  print "done in coroutine\n"
+  invoke when_done
+  end
+.end
