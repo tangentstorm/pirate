@@ -77,7 +77,7 @@ class PirateVisitor:
     
     typeMap = {
         str: "PerlString",
-        int: "PerlNum",
+        int: "PerlInt",
     }
 
     def expression(self, expr, dest):
@@ -152,9 +152,9 @@ class PirateVisitor:
         
     def infixExpression(self, expr, dest):
         operator = self.infixOps[expr.__class__]
-        symleft,  typleft  = self.symbol("$P"), "PerlNum"
-        symright, typright = self.symbol("$P"), "PerlNum"
-        symexpr,  typexpr  = self.symbol("$P"), "PerlNum"
+        symleft,  typleft  = self.symbol("$P"), "PerlInt"
+        symright, typright = self.symbol("$P"), "PerlInt"
+        symexpr,  typexpr  = self.symbol("$P"), "PerlInt"
         res = []
 
         # store left side of expression in symleft:
@@ -194,7 +194,7 @@ class PirateVisitor:
 
         _cmp = self.symbol("_cmp")
         _end = self.symbol("_end")
-        res.append("%s = new PerlNum" % dest)
+        res.append("%s = new PerlInt" % dest)
         res.append("if %s %s %s goto %s" % (symL, op, symR, _cmp))
         res.append("%s = 0" % dest)
         res.append("goto %s" % _end)
@@ -220,7 +220,7 @@ class PirateVisitor:
         else:
             L,R = expr.nodes
             tmp = self.symbol("tmp")
-            res.append(".local PerlNum %s" % tmp)
+            res.append(".local PerlInt %s" % tmp)
             res.extend(self.expression(L, dest))
             res.extend(self.expression(R, tmp))
             res.append("%s %s, %s, %s" % (operator, dest, dest, tmp))
@@ -307,7 +307,7 @@ class PirateVisitor:
             testvar = self.symbol("test")
 
             self.append(".local object %s" % testvar)
-            self.append("%s = new PerlNum" % testvar)
+            self.append("%s = new PerlInt" % testvar)
             self.extend(self.expression(test, testvar))
             self.append("unless %s goto %s" % (testvar, _elif))
             
