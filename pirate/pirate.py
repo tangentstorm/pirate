@@ -18,14 +18,12 @@ import os
 import compiler
 from compiler import ast        
 
-class PirateVisitor:
+class PirateVisitor(object):
 
     ##[ management stuff ]##########################################
     
-    def __init__(self, name, doc="", args=[]):
+    def __init__(self, name):
         self.name = name
-        self.doc = doc
-        self.args = args
         self._last_lineno = None
         self.lines = []
         self.loops = []
@@ -42,12 +40,6 @@ class PirateVisitor:
 
     def getCode(self):
         res  = ".sub %s\n" % self.name
-        if self.doc:
-            res += "    # %s\n" % self.doc
-        if self.args:
-            res += "    saveall\n"
-        for arg in self.args:
-            res += "    .param object %s\n" % arg
         res += "\n".join(self.lines) + "\n"
         res += ".end\n" 
         res += "\n".join([s.getCode() for s in self.subs]) + "\n"
@@ -232,33 +224,48 @@ class PirateVisitor:
                "f(*x,**y) not working yet"
         
         res = []
+        args = []
         node.args.reverse()
         for arg in node.args:
             var = self.symbol("arg")
             res.append(".local object %s" % var)
             res.extend(self.expression(arg, var))
-            res.append(".arg %s" % var)
-            
+            args.append(".arg %s" % var)
+
+
+        
+        ## now call it:
+
 
         # figure out what we're calling
-        adr = self.symbol("$I")
+        adr = self.symbol("$I")        
         if isinstance(node.node, ast.Lambda):
             # lambdas don't have names!
             self.extend(self.lambdaExpression(node.node, adr, allocate=0))
         else:
             sub = node.node.name
-            if sub.startswith("__py__"):
-                # parrot sub. @TODO: "from __parrot__ import __py__print"
-                res.append("%s = addr %s" % (adr, node.node.name))
-            else:
-                # normal sub:
-                res.append("%s = %s" % (adr, sub))
+            res.append("%s = %s" % (adr, sub))
 
-        # do the jump and return the result
-        # @TODO: use parrot calling conventions (invoke)
-        res.append('jsr %s' % adr)
+        sub_pmc = self.symbol("$P")
+        ret = self.symbol("returnaddr")
+        ret_pmc = self.symbol("$P")
+
+        # @TODO: newsub op not working for me yet
+        res.append("%s = new Sub" % sub_pmc)
+        res.append("%s = %s" % (sub_pmc, adr))
+        res.append("%s = new Continuation" % ret_pmc)
+        cadr = self.symbol("$I")
+        res.append("%s = addr %s" % (cadr, ret))
+        res.append("%s = %s" % (ret_pmc, cadr))
+        
+        
+        res.append(".pcc_begin non_prototyped")
+        res.extend(args)
+        res.append('.pcc_call %s, %s' % (sub_pmc, ret_pmc))
+        res.append('%s:' % ret)
         if dest:
             res.append(".result %s" % dest)
+        res.append(".pcc_end")
         return res
 
 
@@ -273,9 +280,9 @@ class PirateVisitor:
 
         # fork a new code generator to walk the function's tree:
         vis = compiler.visitor.ASTVisitor()
-        pir = PirateVisitor(sub,
-                            doc="lambda from line %s" % node.lineno,
-                            args=node.argnames)
+        pir = PirateSubVisitor(sub,
+                               doc="lambda from line %s" % node.lineno,
+                               args=node.argnames)
         vis.preorder(ast.Return(node.code), pir)
         self.subs.append(pir)
 
@@ -432,10 +439,32 @@ class PirateVisitor:
         _res= self.symbol("res")
         self.append(".local object %s" % _res)
         self.extend(self.expression(node.value, _res))
+        self.append(".pcc_begin_return")
         self.append(".return %s" % _res)
-        self.append("restoreall")
-        self.append("ret")
-        
+        self.append(".pcc_end_return")
+                
+
+
+class PirateSubVisitor(PirateVisitor):
+    """
+    I am just like the normal visitor, but
+    work on subroutines instead of whole
+    programs.
+    """
+    def __init__(self, name, doc, args=[]):
+        super(PirateSubVisitor, self).__init__(name)
+        self.doc = doc
+        self.args = args
+    def getCode(self):
+        res = ""
+        if self.doc:
+            res += "# %s\n" % self.doc
+        res  += ".pcc_sub %s non_prototyped\n" % self.name
+        for arg in self.args:
+            res += "    .param object %s\n" % arg
+        res += "\n".join(self.lines) + "\n"
+        res += ".end\n"
+        return res
         
 ## module interface ###############################################
 
