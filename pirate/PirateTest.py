@@ -20,8 +20,8 @@ class PirateTest(unittest.TestCase):
 
     ## test support methods ###################
 
-    def run(self, code, dump=0, lines=1):
-        return pirate.invoke(trim(code), dump, lines=lines)
+    def run(self, code):
+        return pirate.invoke(trim(code))
 
     def runTest(self, file):
         # determine the name of the baseline results
@@ -48,7 +48,7 @@ class PirateTest(unittest.TestCase):
             res = self.run(
                 """
                 a,b = 1,2,3
-                """, dump=0)
+                """)
             gotError = 0
         except ValueError:
             gotError = 1
@@ -60,7 +60,7 @@ class PirateTest(unittest.TestCase):
             res = self.run(
                 """
                 a,b = 5
-                """, dump=0)
+                """)
             gotError = 0
         except TypeError:
             gotError = 1
@@ -86,7 +86,7 @@ class PirateTest(unittest.TestCase):
             print C.x
             del C.x
             print C.x
-            """, dump=0)
+            """)
         self.assertEquals(res, "1\nAttributeError: x\n")
 
     def test_del_key(self):
@@ -96,14 +96,14 @@ class PirateTest(unittest.TestCase):
             print d['a']
             del d['a']
             print d['a']
-            """, dump=0)
+            """)
         self.assertEquals(res, "b\nKeyError: a\n")
 
 
     ## amk's example program #####################
 
     def test_euclid(self):
-        res = pirate.invoke(open("benchmarks/euclid.py").read(), dump=0)
+        res = pirate.invoke(open("benchmarks/euclid.py").read())
         self.assertEquals(res, "96 64\n32\n")
 
 
@@ -138,7 +138,7 @@ class PirateTest(unittest.TestCase):
             print 'to be or',
             raise 'not to be'
             print 'what was the question?'
-            """, dump=0)
+            """)
         # the error message shows up on stderr
         self.assertEquals(res, "to be or not to be\n")
 
@@ -157,7 +157,7 @@ class PirateTest(unittest.TestCase):
                 print '4',
             finally:
                 print '5',
-            """, dump=0)
+            """)
         self.assertEquals(res, "1 3 4 5")
 
     def test_clear_eh(self):
@@ -168,7 +168,7 @@ class PirateTest(unittest.TestCase):
             except:
                print 'do not enter'
             raise hell
-            """, dump=0)
+            """)
         self.assertEquals(res, "Lexical 'hell' not found\n")
 
 

@@ -59,12 +59,12 @@ class PirateVisitor(object):
 
     ##[ management stuff ]##########################################
     
-    def __init__(self, name, counter=None, depth=None):
+    def __init__(self, name, depth=None):
         self.name = name
         self._last_lineno = None
         self.lines = imclist()
         self.loops = []
-        self.counter = counter or {}
+        self.counter = {}
         self.subs = []
         self.depth = depth or 0 # lexical scope depth
         self.klass = 0
@@ -635,7 +635,6 @@ class PirateVisitor(object):
         pir = PirateSubVisitor(sub,
                                depth = self.depth+1,
                                doc=comment,
-                               counter = None, # self.counter,
                                method = method,
                                args=node.argnames)
 
@@ -644,6 +643,16 @@ class PirateVisitor(object):
             vis.preorder(ast.Return(node.code), pir)
         else:
             vis.preorder(node.code, pir)
+            if pir.isGenerator and pir.method:
+                # Python generators return, so parameters aren't local
+                pir = PirateSubVisitor(sub,
+                               depth = self.depth+1,
+                               doc=comment,
+                               method = method,
+                               args=node.argnames)
+                pir.locals={}
+                vis = compiler.visitor.ASTVisitor()
+                vis.preorder(node.code, pir)
             
         self.subs.append(pir)
 
@@ -1120,19 +1129,18 @@ class PirateSubVisitor(PirateVisitor):
     work on subroutines instead of whole
     programs.
     """
-    def __init__(self, name, depth, doc, counter, method, args=[]):
-        super(PirateSubVisitor, self).__init__(name, counter=counter)
+    def __init__(self, name, depth, doc, method, args=[]):
+        super(PirateSubVisitor, self).__init__(name)
         self.doc = doc
         self.args = args
         self.method = method
         if self.method and self.args:
-            self.locals[self.args[0]] = "P2"
+            self.locals[self.args[0]] = "self"
             for (i,arg) in enumerate(self.args[1:]):
                 self.locals[arg] = "P%d" % (i+5)
         else:
             for (i,arg) in enumerate(self.args):
                 self.locals[arg] = "P%d" % (i+5)
-        self.counter = counter or {}
         self.depth = depth
         self.globals = []
         self.isGenerator = 0
@@ -1154,16 +1162,19 @@ class PirateSubVisitor(PirateVisitor):
         if self.doc:
             self.append("")
             self.append("# %s" % self.doc, indent=False)
-        self.append(".sub %s @ANON" % self.name, indent=False)
-        self.append("new_pad %s" % self.depth) #@TODO: use -1 here??
         
         if self.method and self.args:
-            self.append(self.bindLocal(self.args[0], "P2"))
+            self.append(".sub %s @ANON,method" % self.name, indent=False)
+            self.append(self.bindLocal(self.args[0], 'self'))
+            self.append("new_pad %s" % self.depth) #@TODO: use -1 here??
             for (i,arg) in enumerate(self.args[1:]):
                 self.append(self.bindLocal(arg, "P%d" % (i+5)))
         else:
+            self.append(".sub %s @ANON" % self.name, indent=False)
+            self.append("new_pad %s" % self.depth) #@TODO: use -1 here??
             for (i,arg) in enumerate(self.args):
                 self.append(self.bindLocal(arg, "P%d" % (i+5)))
+
         self.lines.extend(code)
 
         if self.emptyReturn:
@@ -1192,17 +1203,17 @@ class PirateSubVisitor(PirateVisitor):
             self.append("")
             self.append("# %s" % self.doc, indent=False)
 
-        self.append(".sub \"%s\" @ANON" % name, indent=False)
-        label = self.genlabel("gen")
-
         if self.method and self.args:
-            self.append(self.bindLocal(self.args[0], "P2"))
+            self.append(".sub \"%s\" @ANON,method" % name, indent=False)
+            self.append(self.bindLocal(self.args[0], 'self'))
             for (i,arg) in enumerate(self.args[1:]):
                 self.append(self.bindLocal(arg, "P%d" % (i+5)))
         else:
+            self.append(".sub \"%s\" @ANON" % name, indent=False)
             for (i,arg) in enumerate(self.args):
                 self.append(self.bindLocal(arg, "P%d" % (i+5)))
 
+        label = self.genlabel("gen")
         self.append("newsub %s, .Coroutine, %s" % (gen,label))
         self.append("new %s, %s" % (result,self.find_type("PyGen")))
         self.append("setref %s, %s" % (result,gen))
@@ -1210,14 +1221,6 @@ class PirateSubVisitor(PirateVisitor):
         self.append(".return (%s)" % result)
         self.label(label)
         self.append("new_pad -1")
-
-        if self.method and self.args:
-            self.append("find_lex P2, '%s'" % self.args[0])
-            for (i,arg) in enumerate(self.args[1:]):
-                self.append("find_lex P%d, '%s'" % (i+5, arg))
-        else:
-            for (i,arg) in enumerate(self.args):
-                self.append("find_lex P%d, '%s'" % (i+5, arg))
 
         self.lines.extend(code)
 
