@@ -171,8 +171,10 @@ class PirateVisitor(object):
             ast.Mul: self.infixExpression,
             ast.Div: self.infixExpression,
             ast.Mod: self.infixExpression,
+            ast.FloorDiv: self.infixExpression,
             ast.LeftShift: self.infixExpression,
             ast.RightShift: self.infixExpression,
+            ast.Power: self.infixExpression,
 
             ast.Bitor: self.expressBitwise,
             ast.Bitxor: self.expressBitwise,            
@@ -338,16 +340,16 @@ class PirateVisitor(object):
     }
     
     def expressBitwise(self, node, allocate):
-        dest = self.gensym("bitwise")        
         op = self.bitwiseOps[node.__class__]
         value = self.compileExpression(node.nodes[0], allocate=1)
         for n in node.nodes[1:]:
             next = self.compileExpression(n)
-            self.append("%s = %s %s %s" % (value, value, op, next))
+            tmp = self.gensym("tmp")
+            self.append(tmp + " = new PyObject")
+            self.append("%s = %s %s %s" % (tmp, value, op, next))
+            value = tmp
                
-        #Bitand: "&",
-        self.append("%s = %s" % (dest, value))
-        return dest
+        return value
 
     infixOps = {
         ast.Add: "+",
@@ -355,8 +357,10 @@ class PirateVisitor(object):
         ast.Mul: "*",
         ast.Div: "/",
         ast.Mod: "%",
+        ast.FloorDiv: "//",
         ast.RightShift: '>>',   # untested
         ast.LeftShift: '<<',    # untested
+        ast.Power: "**",
     }
         
     def infixExpression(self, node, allocate):
@@ -368,7 +372,12 @@ class PirateVisitor(object):
             rside = self.compileExpression(node.right, allocate=1)
         
         op = self.infixOps[node.__class__]
-        self.append("%s = %s %s %s" % (dest, lside, op, rside))
+        if op == "**":
+            if rside.isdigit():
+                rside = self.compileExpression(node.right, allocate=1)
+            self.append("%s = %s.__pow__(%s)" % (dest, lside, rside))
+        else:
+            self.append("%s = %s %s %s" % (dest, lside, op, rside))
 
         # put the result in our destination
         # (imcc seems to like this as a separate step
@@ -687,8 +696,9 @@ class PirateVisitor(object):
         elif isinstance(aug.node, ast.Subscript):   # e.g. (x+a)[0] += 2
             lhs = ast.Subscript(aug.node.expr, 'OP_ASSIGN', aug.node.subs)
 
-        ops = {'**=':'Power', '*=':'Mul', '/=':'Div', '%=':'Mod', '+=':'Add',
-               '-=':'Sub', '<<=':'LeftShift', '>>=':'RightShift',
+        ops = {'**=':'Power', '*=':'Mul', '/=':'Div', '//=':'FloorDiv',
+               '%=':'Mod', '+=':'Add', '-=':'Sub',
+               '<<=':'LeftShift', '>>=':'RightShift',
                '|=':'Bitor', '^=':'Bitxor', '&=':'Bitand'}
         op_node_class = getattr(ast, ops[aug.op])
         rhs = op_node_class((aug.node, aug.expr))
@@ -1094,9 +1104,10 @@ def compile(src, name="__main__"):
     pir.append("end")
     #@TODO: refactor this mess:
     if name=="__main__":
-        lines = [".local object range",
-                 "newsub range, .Sub, __builtin___range0",
-                 "store_lex 0, 'range', range"]
+        lines = ["    .local object builtin"]
+        for builtin in ['abs','cmp','float','hex','int','oct','range']:
+            lines += ["    newsub builtin, .Sub, __builtin___%s0" % builtin,
+                      "    store_lex 0, '%s', builtin" % builtin]
 
         pir.lines = lines + pir.lines
     code =  pir.getCode()
