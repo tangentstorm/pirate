@@ -13,11 +13,13 @@ def trim(s):
     # strip indendation:
     indent = len(lines[0]) - len(lines[0].lstrip())
     return "\n".join([line[indent:] for line in lines])
-
-def run(src, dump=0, lines=1):    
-    return pirate.invoke(trim(src), dump, lines=lines)
+    
 
 class PirateTest(unittest.TestCase):
+
+    def run(self, code, dump=0, lines=1):
+        return pirate.invoke(trim(code), dump, lines=lines)
+
 
     def test_compile(self):
         # in general, won't actually test bytecode, but
@@ -37,7 +39,7 @@ class PirateTest(unittest.TestCase):
 
     
     def test_print(self):
-        res = run(
+        res = self.run(
             """
             print 'hello,',
             print 'world!'
@@ -46,7 +48,7 @@ class PirateTest(unittest.TestCase):
 
 
     def test_if(self):
-        res = run(
+        res = self.run(
             """
             if 1:
                 print 'shiver me timbers!'
@@ -64,7 +66,7 @@ class PirateTest(unittest.TestCase):
                                  + "avast, ye landlubbers!\n")
         
     def test_if_expr(self):
-        res = run(
+        res = self.run(
             """
             n = 1
             if n > 0:
@@ -74,7 +76,7 @@ class PirateTest(unittest.TestCase):
         
 
     def test_assignment(self):
-        res = run(
+        res = self.run(
             """
             a = 1
             b, c = 2, 3
@@ -84,7 +86,7 @@ class PirateTest(unittest.TestCase):
 
 
     def test_math(self):
-        res = run(
+        res = self.run(
             """
             x = (1 + 2) * 3 - 4
             print x % 3
@@ -92,8 +94,9 @@ class PirateTest(unittest.TestCase):
             """)
         self.assertEquals(res, "2\n2.000000\n")
 
+
     def test_while(self):
-        res = run(
+        res = self.run(
             """
             x = 3
             while x:
@@ -104,7 +107,7 @@ class PirateTest(unittest.TestCase):
 
 
     def test_compare(self):
-        res = run(
+        res = self.run(
             """
             #@TODO: print 1<2<3
             print 1==1, 0!=0, 1>0, 1<=5,
@@ -120,14 +123,14 @@ class PirateTest(unittest.TestCase):
 
 
     def test_list(self):
-        res = run(
+        res = self.run(
             """
             print [], [1], [1,2,3], [[],[4],[]]
             """)
         self.assertEquals(res, "[] [1] [1, 2, 3] [[], [4], []]\n")
     
     def test_for(self):
-        res = run(
+        res = self.run(
             """
             for num in [1, 2, 3, 4, 5]:
                 print num * num,
@@ -136,7 +139,7 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "1 4 9 16 25 \n")
 
     def test_break(self):
-        res = run(
+        res = self.run(
             """
             for x in [1, 2]:
                 for y in [1,2,3,4,5]:
@@ -152,7 +155,7 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "[1, 1] [2, 1] 1 2 ")
 
     def test_continue(self):
-        res = run(
+        res = self.run(
             """
             for num in [1, 2, 3, 4, 5]:
                 if num < 4: continue
@@ -168,7 +171,7 @@ class PirateTest(unittest.TestCase):
 
 
     def test_logic(self):
-        res = run(
+        res = self.run(
             """
             print 'cat' or 'mouse',
             if not (1 and 0): print 'and',
@@ -178,7 +181,7 @@ class PirateTest(unittest.TestCase):
 
 
     def test_function(self):
-        res = run(
+        res = self.run(
             """
             __py__print('function call!') # from pirate.imc!!
             """, dump=0)
@@ -186,7 +189,7 @@ class PirateTest(unittest.TestCase):
 
         
     def test_lambda(self):
-        res = run(
+        res = self.run(
             """
             f = lambda x: x+1
             print f(4), f(5)
@@ -194,7 +197,7 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "5 6\n")
         
     def test_lambda_anonymous(self):
-        res = run(
+        res = self.run(
             """
             print (lambda x: x*x)(5)
             """, dump=0, lines=0)
