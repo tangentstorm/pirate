@@ -77,10 +77,31 @@ RUNNING THE TESTS
 
    But, hopefully it's working and we can move on. :)
 
-   Now look inside PirateTest.py ... You'll see there's
-   a utility function called trim() (nice for indenting 
-   multi-line strings in python code) and then a class 
-   called PirateTest with a bunch of test_xyz methods. 
+   In most cases, creating a test is easy.  Simply place
+   a testname.py file in the test/python directory and
+   PirateTest will automatically run the test through the
+   Python interpreter and capture the output, and then
+   compile the same source to Parrot, run it, and compare
+   the outputs.  If they are the same, the test passes;
+   if not, the test fails... what can be simpler?
+
+   You can also run any individual test like this:
+
+   % python pirate.py test/python/print.py
+   hello, world!
+
+   There may also be some pirate specific functions that
+   require testing... for example, the PARROT_INLINE
+   function.  For these, simply check in both the python
+   source and the expected output (with an extension of
+   .out) into the test/pyrate directory.
+
+   Tests that require additional code to implement are
+   placed directly in PirateTest.py. If you look in there,
+   you'll see there's a utility function called trim() 
+   (nice for indenting multi-line strings in python code)
+   and then a class called PirateTest with a bunch of
+   test_xyz methods. 
 
    Each of these methods calls self.run() on a chunk of
    python code. run() compiles the code and invokes parrot
