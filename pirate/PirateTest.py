@@ -53,13 +53,17 @@ class PirateTest(unittest.TestCase):
             gotError = 1
         assert gotError, "should get unpack sequence wrong size ValueError"
             
-    def test_unpack_empty_list(self):
+    def test_unpack_list(self):
         res = self.run(
             """
             a = []
-            print a
+            print a,
+            b = [1]
+            print b,
+            c = [1,2,3]
+            print c,
             """, dump=0)
-        self.assertEquals(res, "[]\n")
+        self.assertEquals(res, "[] [1] [1, 2, 3] ")
             
 
     def test_unpack_non_sequence(self):

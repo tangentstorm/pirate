@@ -670,15 +670,16 @@ class PirateVisitor(object):
         lside = listify(node.nodes[0])
         rside = listify(node.expr)
 
-        if (len(lside) == len(rside)):
+        
+        if len(rside)==0 or len(lside)==1:
+            # eg, x = []
+            self.assign(lside[0], self.evaluate(node.expr))
+
+        elif (len(lside) == len(rside)):
             ## this works for l=r AND l=r,r,r,r
             ## because of AssTuple nodes :)
             for node, expr in zip(lside, rside):
                 self.assign(node, self.evaluate(expr))
-
-        elif len(rside)==0:
-            # eg, x = []
-            self.assign(lside[0], self.evaluate(node.expr))
 
         elif len(rside)==1:
             ## this handles l,l,l=r and l,l,l=r()
