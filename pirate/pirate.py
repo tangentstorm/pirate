@@ -41,7 +41,8 @@ class PirateVisitor(object):
     def getCode(self):
         res  = ".sub %s\n" % self.name
         res += "\n".join(self.lines) + "\n"
-        res += ".end\n" 
+        res += ".end\n"
+        res += ".include 'pirate.imc'"
         res += "\n".join([s.getCode() for s in self.subs]) + "\n"
         return res
     
@@ -510,14 +511,18 @@ def invoke(src, dump=0, lines=0):
         else:
             print code
     print >> i, code
-    print >> i, open("pirate.imc").read()
     i.close()    
     return o.read()
 
 if __name__=="__main__":
     import sys
     if len(sys.argv) > 1:
-        src = open(sys.argv[-1]).read()
+        # file or stdin?
+	if sys.argv[-1] == '-':
+	    src = sys.stdin.read()
+	else:
+	    src = open(sys.argv[-1]).read()
+        # dump or run?
         if "-d" in sys.argv:
             print compile(src)
         else:
