@@ -37,7 +37,8 @@ class PirateTest(unittest.TestCase):
     def test_print(self):
         result = pirate.invoke(trim(
             """
-            print 'hello, world!'
+            print 'hello,',
+            print 'world!'
             """), dump=0)
         self.assertEquals(result, "hello, world!\n")
 
@@ -86,12 +87,11 @@ class PirateTest(unittest.TestCase):
             """
             x = 3
             while x:
-                print x
+                print x,
                 x = x - 1
             """), dump=0)
-        self.assertEquals(result, "3\n2\n1\n")
+        self.assertEquals(result, "3 2 1 ")
 
-            
 
 
 if __name__=="__main__":

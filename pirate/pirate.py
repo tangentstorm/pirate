@@ -113,7 +113,7 @@ class PirateVisitor:
     
     ##[ visitor methods ]##########################################
         
-    def visitPrintnl(self, node):
+    def visitPrint(self, node):
         assert node.dest is None, "print >> not yet handled"
         for n in node.nodes:
             self.extend(self.set_lineno(n))
@@ -122,6 +122,9 @@ class PirateVisitor:
             self.extend(self.expression(n, dest))
             self.append('print %s' % dest) # % repr(n.value))
             self.append('print " "')
+
+    def visitPrintnl(self, node):
+        self.visitPrint(node)
         if node.nodes:
             self.unappend() # remove final space
         self.append('print "\\n"')
