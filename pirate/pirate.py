@@ -140,6 +140,7 @@ class PirateVisitor(object):
             return self.locals[name]
         dest = self.gensym()
         self.append("find_lex %s, '%s'" % (dest, name))
+        self.locals[name] = dest
         return dest
     ##[ expression compiler ]######################################
     
