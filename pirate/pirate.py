@@ -453,13 +453,13 @@ class PirateVisitor(object):
 
     ##[ list comprehensions ]#######################################
 
-    # This section transforms a list comprhension into a
-    # set of nested for and if blocks.
-    #
-    # It's in the middle here because it uses expressXXX() AND visitXXX()
-    #
-    # @TODO: put this tree transformation in its own Visitor class
-    # but -- if we do that, we can only use nodes, not self.append()
+    ## This section transforms a list comprhension into a
+    ## set of nested for and if blocks.
+    ##
+    ## It's in the middle here because it uses expressXXX() AND visitXXX()
+    ##
+    ## @TODO: put this tree transformation in its own Visitor class
+    ## but -- if we do that, we can only use nodes, not self.append()
 
     global ListCompExpr # yech, but I wanted this all in one place.
     class ListCompExpr(ast.Node):
@@ -503,7 +503,6 @@ class PirateVisitor(object):
         
 
     ##[ visitor methods ]##########################################
-        
 
     def visitPrint(self, node):
         assert node.dest is None, "print >> not yet handled"
@@ -643,14 +642,15 @@ class PirateVisitor(object):
         _while = self.symbol("while")
         _endwhile = self.symbol("endwhile")
         self.loops.append((_while, _endwhile))
-        self.append("%s:" % _while)
+        
         testvar = self.symbol("$P")
-        self.append("%s = new PerlInt" % testvar)
+        self.append("%(_while)s:" % locals())
+        self.append("%(testvar)s = new PerlInt" % locals())
         self.compileExpression(node.test, testvar)
-        self.append("unless %s goto %s" % (testvar, _endwhile))
+        self.append("unless %(testvar)s goto %(_endwhile)s" % locals())
         self.visit(node.body)
-        self.append("goto %s" % _while)
-        self.append("%s:" % _endwhile)
+        self.append("goto %(_while)s" % locals())
+        self.append("%(_endwhile)s:" % locals())
         self.loops.pop()
 
 
@@ -663,25 +663,22 @@ class PirateVisitor(object):
         self.append(".local object %s" % node.assign.name)
         _for = self.symbol("for")
         _endfor = self.symbol("endfor")
+        self.loops.append((_for, _endfor))
+
         loopidx = self.symbol("idx")
         forlist = self.symbol("list")
         listlen = self.symbol("$I")
-
-        self.loops.append((_for, _endfor))
 
         # first get the list
         self.append(".local PerlArray %s" % forlist)
         self.compileExpression(node.list, forlist)
 
-        # forlist = len(list)
-        self.append("%s = %s" % (listlen, forlist))
-
-        # int counter = 0
-        self.append(".local int %s" % loopidx)        
-        self.append("%s = 0" % loopidx)
+        self.append("%(listlen)s = %(forlist)s" % locals())
+        self.append(".local int %(loopidx)s" % locals())
+        self.append("%(loopidx)s = 0" % locals())
 
         # get the next item (also where "continue" jumps to)
-        self.append("%s:" % _for)        
+        self.append("%(_for)s:" % locals())
         self.append("%s = %s[%s]" % (node.assign.name, forlist, loopidx))
 
         value = self.symbol("$P")
@@ -694,15 +691,14 @@ class PirateVisitor(object):
         self.visit(node.body)
 
         # now loop!
-        self.append("if %s < %s goto %s" % (loopidx, listlen, _for))
-        self.append("%s:" % _endfor)
+        self.append("if %(loopidx)s < %(listlen)s goto %(_for)s" % locals())
+        self.append("%(_endfor)s:" % locals())
         
         self.loops.pop()
 
 
     def visitBreak(self, node):
         assert self.loops, "break outside of loop" # SyntaxError
-
         self.append("goto %s" % self.loops[-1][1])
 
 
