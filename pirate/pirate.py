@@ -153,6 +153,7 @@ class PirateVisitor(object):
             self.append("if %s goto %s" % (cond, label))
         else:
             self.append("goto " + label)
+            self.reachable=False
 
     def bindLocal(self, name, value):
         self.locals[name] = value
@@ -1021,7 +1022,7 @@ class PirateVisitor(object):
 
     def visitFunction(self, node):  # visitDef
         if self.classStack:
-            fun = self.genFunction(node, node.name, method=True, allocate=1)
+            fun = self.genFunction(node, node.name, method=True, allocate=0)
             klass = self.classStack[-1]
             self.append("setprop %s, '%s', %s" % (klass, node.name, fun))
         else:
@@ -1053,6 +1054,8 @@ class PirateVisitor(object):
             msg = self.compileExpression(node.expr1)
             self.append("new %s, .Exception" % exceptsym)
             self.append('%s["_message"] = %s' % (exceptsym, msg))
+            if msg == '"StopIteration"':
+              self.append('%s["_type"] = 2' % exceptsym)
 
         self.append("throw %s" % exceptsym)
 
@@ -1156,7 +1159,7 @@ class PirateSubVisitor(PirateVisitor):
     def getCodeForFunction(self):
         code = self.lines
         self.lines = imclist()
-        fallthrou = self.reachable
+        fallthru = self.reachable
         self.reachable = True
 
         if self.doc:
@@ -1181,7 +1184,7 @@ class PirateSubVisitor(PirateVisitor):
             fallthru = True
             self.label(self.emptyReturn, optional=True)
 
-        if fallthrou:
+        if fallthru:
             dest = self.gensym()
             self.append("new %s, %s" % (dest,self.find_type("PyNone")))
             self.append(".return (%s)" % dest)
@@ -1192,7 +1195,7 @@ class PirateSubVisitor(PirateVisitor):
     def getCodeForGenerator(self):
         code = self.lines
         self.lines = imclist()
-        fallthrou = self.reachable
+        fallthru = self.reachable
         self.reachable = True
         
         gen = self.gensym()
@@ -1228,7 +1231,7 @@ class PirateSubVisitor(PirateVisitor):
             fallthru = True
             self.label(self.emptyReturn, optional=True)
 
-        if fallthrou:
+        if fallthru:
             stop = ast.Raise(ast.Const("StopIteration"), None, None)
             self.visit(stop)
 
