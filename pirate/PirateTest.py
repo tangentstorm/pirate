@@ -180,12 +180,13 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "cat and mouse ")
 
 
-    def test_function(self):
-        res = self.run(
-            """
-            __py__print('function call!') # from pirate.imc!!
-            """, dump=0)
-        self.assertEquals(res, "function call!")
+## @TODO: re=enable this with set-lex
+##     def test_function(self):
+##         res = self.run(
+##             """
+##             __py__print('function call!') # from pirate.imc!!
+##             """, dump=0)
+##         self.assertEquals(res, "function call!")
 
         
     def test_lambda(self):
@@ -207,4 +208,3 @@ class PirateTest(unittest.TestCase):
         
 if __name__=="__main__":
     unittest.main()
-    
