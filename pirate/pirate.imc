@@ -7,10 +7,10 @@
     saveall
     .param object s
     typeof $S0, s
-    if $S0 == "PerlArray" goto _list
+    if $S0 == "PerlArray" goto list
         print s
-        goto _endif
-    _list:
+        goto endif
+    list:
         .local int len
         .local int i
         .local object item
@@ -18,18 +18,18 @@
         print "["
         len = s
         i = 0
-        _loop:
-            if i >= len goto _endloop
+        loop:
+            if i >= len goto endloop
             item = s[i]
             .arg item
             call _pyprint
             i = i + 1
-            if i >= len goto _endloop
+            if i >= len goto endloop
             print ", "
-            goto _loop
-        _endloop:
+            goto loop
+        endloop:
         print "]"
-    _endif:
+    endif:
     restoreall
     ret
 .end
