@@ -46,14 +46,28 @@ class PirateVisitor:
     def extend(self, lines):
         for line in lines:
             self.append(line)
-            
+
+    ##[ expression compiler ]######################################
+
+    def expression(self, expr, dest):
+        """
+        create code to eval expression Node 'expr' and put it in 'dest'
+        """
+        if isinstance(expr, compiler.ast.Name):
+            return ["%s = %s" % (dest, expr.name)]
+        elif isinstance(expr, compiler.ast.Const):
+            return ["%s = %s" % (dest, repr(expr.value))]
+        
     ##[ visitor methods ]##########################################
         
     def visitPrintnl(self, node):
         assert node.dest is None, "print >> not yet handled"
         for n in node.nodes:
             self.extend(self.set_lineno(n))
-            self.append('print %s' % repr(n.value))
+            dest = self.symbol("$P")
+            self.append("%s = new PerlString" % dest) 
+            self.extend(self.expression(n, dest))
+            self.append('print %s' % dest) # % repr(n.value))
             self.append('print " "')
         if node.nodes:
             self.unappend() # remove final space
@@ -85,7 +99,23 @@ class PirateVisitor:
         # _endif:
         self.append("%s:" % _endif)
 
+
+    def visitAssign(self, node):
+        leftside = node.nodes[0]
+        rightside = node.expr
+        if isinstance(leftside, compiler.ast.AssTuple):
+            leftside = leftside.nodes
+            rightside = rightside.nodes
+        else:
+            leftside = [leftside]
+            rightside = [rightside]
+        for node, expr in zip(leftside, rightside):
+            name = node.name
+            self.append(".local string %s" % name) 
+            self.extend(self.expression(expr, name))
+
 ## module interface ###############################################
+
 
 def compile(src):
     ast = compiler.parse(src)

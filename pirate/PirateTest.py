@@ -34,7 +34,7 @@ class PirateTest(unittest.TestCase):
         assert result == goal, "bad bytecode from compile():\n%s" % result
 
     
-    def testPrint(self):
+    def test_print(self):
         result = pirate.invoke(trim(
             """
             print 'hello, world!'
@@ -42,7 +42,7 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(result, "hello, world!\n")
 
 
-    def testIf(self):
+    def test_if(self):
         result = pirate.invoke(trim(
             """
             if 1:
@@ -62,7 +62,14 @@ class PirateTest(unittest.TestCase):
                                  + "yar har har!\n" \
                                  + "avast, ye landlubbers!\n")
 
-       
+    def test_assignment(self):
+        result = pirate.invoke(trim(
+            """
+            a = 1
+            b, c = 2, 3
+            print a, b, c
+            """), dump=0)
+        self.assertEquals(result, "1 2 3\n")
 
 
 if __name__=="__main__":
