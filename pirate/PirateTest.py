@@ -428,7 +428,7 @@ class PirateTest(unittest.TestCase):
             """
             try:
                 print 'parrot',
-                raise 'hell'
+                raise hell
                 print 'dropped the ball'
             except:
                 print 'caught it!'
@@ -440,7 +440,7 @@ class PirateTest(unittest.TestCase):
             """
             try:
                 print '1',
-                raise 'hell'
+                raise hell
                 print '2',
             finally:
                 print '3',
@@ -459,9 +459,9 @@ class PirateTest(unittest.TestCase):
                pass
             except:
                print 'do not enter'
-            raise 'hell'
+            raise hell
             """, dump=0)
-        self.assertEquals(res, "hell\n")
+        self.assertEquals(res, "Lexical 'hell' not found\n")
 
 
 
