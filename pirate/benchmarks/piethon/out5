@@ -1,0 +1,268 @@
+0 == 0L
+0 == 0L
+0L == 0L
+0.0 == 0.0
+0.0 == 0L
+True == True
+True == True
+False == False
+True == True
+False == False
+True == True
+False == False
+0j == 0j
+{1: 2, 3: 4} == {1: 2, 3: 4}
+{'a': None, 'c': None, 'b': None} == {'a': None, 'c': None, 'b': None}
+(1, 3) == (1, 3)
+[(0, 'a'), (1, 'b'), (2, 'c')] == [(0, 'a'), (1, 'b'), (2, 'c')]
+[1, 2, 3, 4, 5, 6, 7, 8, 9] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+[0, 1, 2, 3, 4] == [0, 1, 2, 3, 4]
+1.5 == 1.5
+0.0 == 0.0
+1e+100 == 1e+100
+42 == 42
+42 == 42
+42 == 42
+-1600925533 == -1600925533
+'0x2a' == '0x2a'
+'0x2al' == '0x2al'
+42 == 42
+12345678910L == 12345678910L
+42 == 42
+34 == 34
+66 == 66
+34 == 34
+66 == 66
+[1, 2, 3] == [1, 2, 3]
+['a', 'b', 'c'] == ['a', 'b', 'c']
+[u'a', u'b', u'c'] == ['a', 'b', 'c']
+42L == 42
+12345678910L == 12345678910L
+42L == 42
+34L == 34
+66L == 66
+34L == 34
+66L == 66
+True == True
+False == False
+False == False
+True == True
+False == False
+True == True
+False == False
+True == True
+True == True
+True == True
+True == True
+True == True
+True == True
+True == True
+False == False
+False == False
+True == True
+'a' == 'a'
+'b' == 'b'
+'c' == 'c'
+'d' == 'd'
+'e' == 'e'
+'f' == 'f'
+next() raised StopIteration
+next() raised StopIteration
+[0, 1, 2, 3, 4] == [0, 1, 2, 3, 4]
+[(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)] == [(0, 0), (1, 1), (2, 2), (3, 3), (4, 4)]
+[1, 2, 3, 4, 5] == [1, 2, 3, 4, 5]
+[0, 1, 2, 3] == [0, 1, 2, 3]
+5 == 5
+3 == 3
+'c' == 'c'
+u'c' == u'c'
+1 == 1
+1 == 1
+'B' == 'B'
+u'B' == u'B'
+'052' == '052'
+'052L' == '052L'
+97 == 97
+97 == 97
+4660 == 4660
+1024 == 1024
+1267650600228229401496703205376L == 1267650600228229401496703205376L
+24 == 24
+'abcde' == 'abcde'
+'42' == '42'
+'42L' == '42L'
+'3.5' == '3.5'
+'4.5j' == '4.5j'
+'(3+4j)' == '(3+4j)'
+'(-3+4j)' == '(-3+4j)'
+'-4j' == '-4j'
+'(3.5+0j)' == '(3.5+0j)'
+"'abc'" == "'abc'"
+"'abc\\n'" == "'abc\\n'"
+"u'abc'" == "u'abc'"
+"u'abc\\u1234'" == "u'abc\\u1234'"
+'[0, 1, 2, 3, 4]' == '[0, 1, 2, 3, 4]'
+"('a', 'b', 'c')" == "('a', 'b', 'c')"
+'{1: 42}' == '{1: 42}'
+'42' == '42'
+'42L' == '42L'
+'3.5' == '3.5'
+'4.5j' == '4.5j'
+'(3+4j)' == '(3+4j)'
+"'abc'" == "'abc'"
+'[0, 1, 2]' == '[0, 1, 2]'
+"(1, 2, 'c')" == "(1, 2, 'c')"
+'{}' == '{}'
+3.0 == 3.0
+3.1000000000000001 == 3.1000000000000001
+30.0 == 30.0
+'42' == '42'
+'42' == '42'
+'3.5' == '3.5'
+'4.5j' == '4.5j'
+'(3+4j)' == '(3+4j)'
+'(-3+4j)' == '(-3+4j)'
+'-4j' == '-4j'
+'(3.5+0j)' == '(3.5+0j)'
+'abc' == 'abc'
+'[0, 1, 2, 3, 4]' == '[0, 1, 2, 3, 4]'
+"('a', 'b', 'c')" == "('a', 'b', 'c')"
+'{1: 42}' == '{1: 42}'
+55 == 55
+10.0 == 10
+('a', 'b', 'c') == ('a', 'b', 'c')
+(0, 1, 2, 3, 4) == (0, 1, 2, 3, 4)
+(1,) == (1,)
+(u'a', u'b', u'c', u'\u1234') == (u'a', u'b', u'c', u'\u1234')
+<type 'bool'> == <type 'bool'>
+<type 'int'> == <type 'int'>
+<type 'long'> == <type 'long'>
+<type 'float'> == <type 'float'>
+<type 'complex'> == <type 'complex'>
+<type 'str'> == <type 'str'>
+<type 'unicode'> == <type 'unicode'>
+<type 'tuple'> == <type 'tuple'>
+<type 'list'> == <type 'list'>
+<type 'dict'> == <type 'dict'>
+<type 'type'> == <type 'type'>
+<type 'type'> == <type 'type'>
+<type 'function'> == <type 'function'>
+<type 'type'> == <type 'type'>
+<class '__main__.MC'> == <class '__main__.MC'>
+<class '__main__.MC'> == <class '__main__.MC'>
+u'abc' == u'abc'
+u'abc' == u'abc'
+u'abc' == u'abc'
+u'abc' == u'abc'
+u'abc\xff' == u'abc\xff'
+u'abc\xff' == u'abc\xff'
+u'abc\xff' == u'abc\xff'
+u'abc\xff' == u'abc\xff'
+unicode('abc\xff',) raised UnicodeError
+decode() raised UnicodeError
+unicode('abc\xff', 'us_ascii') raised UnicodeError
+decode('Ascii',) raised UnicodeError
+unicode('abc\xff', 'UTF-8') raised UnicodeError
+decode('utf8',) raised UnicodeError
+'abc\xc3\xbf' == 'abc\xc3\xbf'
+'abc\xff' == 'abc\xff'
+encode('Ascii',) raised UnicodeError
+'abc' == 'abc'
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+[('a', 'd'), ('b', 'e'), ('c', 'f')] == [('a', 'd'), ('b', 'e'), ('c', 'f')]
+[('a', 'd', 'g'), ('b', 'e', 'h'), ('c', 'f', 'i')] == [('a', 'd', 'g'), ('b', 'e', 'h'), ('c', 'f', 'i')]
+None == None
+getattr(<C object>, 'booh') raised AttributeError
+getattr(<C object>, 'x') raised AttributeError
+getattr(<C object>, 'xx') raised AttributeError
+setattr(<C object>, 'xx', 42) raised AttributeError
+42 == 42
+42 == 42
+42 == 42
+delattr(<C object>, 'xx') raised AttributeError
+getattr(<C object>, 'x') raised AttributeError
+getattr(<C object>, 'xx') raised AttributeError
+None == None
+None == None
+delattr(<C object>, 'x') raised AttributeError
+([<C object>, 42], {}) == ([<C object>, 42], {})
+([<class '__main__.C'>, 42], {'foo': 42}) == ([<class '__main__.C'>, 42], {'foo': 42})
+([42], {'a': 1, 'b': 2}) == ([42], {'a': 1, 'b': 2})
+'<C object>' == '<C object>'
+42 == 42
+42 == 42
+setattr(<C object>, 'foo', 42) raised RuntimeError
+'hello' == 'hello'
+getattr(<C object>, 'spam') raised IndexError
+'booh' == 'booh'
+42 == 42
+'booh' == 'booh'
+42 == 42
+getattr(<C object>, 'spam') raised IndexError
+getattr(<C object>, 'spam', None) raised IndexError
+'booh' == 'booh'
+None == None
+getattr(<C object>, 'booh') raised AttributeError
+getattr(<C object>, 'x') raised AttributeError
+getattr(<C object>, 'xx') raised AttributeError
+setattr(<C object>, 'xx', 42) raised AttributeError
+42 == 42
+42 == 42
+42 == 42
+delattr(<C object>, 'xx') raised AttributeError
+getattr(<C object>, 'x') raised AttributeError
+getattr(<C object>, 'xx') raised AttributeError
+None == None
+None == None
+delattr(<C object>, 'x') raised AttributeError
+([<C object>, 42], {}) == ([<C object>, 42], {})
+([<class '__main__.C'>, 42], {'foo': 42}) == ([<class '__main__.C'>, 42], {'foo': 42})
+([42], {'a': 1, 'b': 2}) == ([42], {'a': 1, 'b': 2})
+'<C object>' == '<C object>'
+42 == 42
+42 == 42
+setattr(<C object>, 'foo', 42) raised RuntimeError
+'hello' == 'hello'
+getattr(<C object>, 'spam') raised IndexError
+'booh' == 'booh'
+42 == 42
+'booh' == 'booh'
+42 == 42
+getattr(<C object>, 'spam') raised IndexError
+getattr(<C object>, 'spam', None) raised IndexError
+'booh' == 'booh'
+None == None
+getattr(<C object>, 'booh') raised AttributeError
+getattr(<C object>, 'x') raised AttributeError
+getattr(<C object>, 'xx') raised AttributeError
+setattr(<C object>, 'xx', 42) raised AttributeError
+42 == 42
+42 == 42
+42 == 42
+delattr(<C object>, 'xx') raised AttributeError
+getattr(<C object>, 'x') raised AttributeError
+getattr(<C object>, 'xx') raised AttributeError
+None == None
+None == None
+delattr(<C object>, 'x') raised AttributeError
+([<C object>, 42], {}) == ([<C object>, 42], {})
+([<class '__main__.C'>, 42], {'foo': 42}) == ([<class '__main__.C'>, 42], {'foo': 42})
+([42], {'a': 1, 'b': 2}) == ([42], {'a': 1, 'b': 2})
+'<C object>' == '<C object>'
+42 == 42
+42 == 42
+setattr(<C object>, 'foo', 42) raised RuntimeError
+'hello' == 'hello'
+getattr(<C object>, 'spam') raised IndexError
+'booh' == 'booh'
+42 == 42
+'booh' == 'booh'
+42 == 42
+getattr(<C object>, 'spam') raised IndexError
+getattr(<C object>, 'spam', None) raised IndexError
+'booh' == 'booh'
+42 == 42
+42 == 42
+None == None
+42 == 42
+OK.
