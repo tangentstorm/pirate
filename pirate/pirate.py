@@ -606,8 +606,6 @@ class PirateVisitor(object):
 
 
     def genFunction(self, node,  name, allocate=1):
-        assert not node.kwargs and not node.varargs, \
-               "@TODO: only simple args for now"
         self.set_lineno(node)
 
         # functions are always anonymous, so make fake names
@@ -643,6 +641,20 @@ class PirateVisitor(object):
         self.append("newsub %s, %s, %s" % (ref, self.find_type("PyFunc"), sub))
         for (i, arg) in enumerate(node.argnames):
             self.append("%s[%s] = '%s'" % (ref, i, arg))
+
+        if node.defaults:
+            defaults = self.gensym()
+            self.append("new %s, %s" % (defaults, self.find_type("PyList")))
+            for (i,value) in enumerate(node.defaults):
+                self.append("%s[%s] = %s" % 
+                    (defaults, i, self.compileExpression(value)))
+            self.append("setprop %s, 'func_defaults', %s" % (ref, defaults))
+
+        if node.varargs: 
+            self.append("setprop %s, 'func_varargs', %s" % (ref, ref))
+        if node.kwargs: 
+            self.append("setprop %s, 'func_kwargs', %s" % (ref, ref))
+
         if allocate>0:
             self.append(self.bindLocal(node.name, ref))
             self.vars[ref] = ref
@@ -907,8 +919,6 @@ class PirateVisitor(object):
 
 
     def visitFor(self, node):
-        assert not isinstance(node.assign, ast.AssTuple), \
-               "@TODO: for x,y not implemented yet"
         self.set_lineno(node)
         _for = self.genlabel("for")
         _endfor = self.genlabel("endfor")
@@ -927,7 +937,15 @@ class PirateVisitor(object):
         self.label(_for)
         self.append("unless %s goto %s" % (iter, _elsefor))
         self.append("%s = shift %s" % (item, iter))
-        self.append(self.bindLocal(node.assign.name, item))
+
+        if isinstance(node.assign, ast.AssTuple):
+            # todo: throw something if len(node.assign.nodes) != len(item)
+            for (i, name) in enumerate(node.assign.nodes):
+                extract = self.gensym()
+                self.append("%s = %s[%s]" % (extract, item, i))
+                self.assign(name, extract)
+        else:
+            self.append(self.bindLocal(node.assign.name, item))
         
         # do the loop body
         self.visit(node.body)
@@ -1088,9 +1106,9 @@ class PirateSubVisitor(PirateVisitor):
         super(PirateSubVisitor, self).__init__(name, counter=counter)
         self.doc = doc
         self.args = args
-        self.locals = vars
-        for arg in self.args:
-            self.locals[arg]=arg
+        # self.locals = vars
+        # for (i,arg) in enumerate(self.args):
+        #     self.locals[arg] = "P%d" % (i+5)
         self.counter = counter
         self.depth = depth
         self.globals = []
@@ -1111,12 +1129,10 @@ class PirateSubVisitor(PirateVisitor):
             self.append("")
             self.append("# %s" % self.doc, indent=False)
         self.append(".sub %s @ANON" % self.name, indent=False)
-        for arg in self.args:
-            self.append(".param object " + arg)
         self.append("new_pad %s" % self.depth) #@TODO: use -1 here??
         
-        for arg in self.args:
-            self.append(self.bindLocal(arg, arg))
+        for (i,arg) in enumerate(self.args):
+            self.append(self.bindLocal(arg, "P%d" % (i+5)))
         self.lines.extend(code)
 
         if self.reachable:
