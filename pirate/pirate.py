@@ -1050,13 +1050,12 @@ def compile(src, name="__main__"):
     pir = PirateVisitor(name)
     vis.preorder(ast, pir)
     pir.append("end")
-    #@TODO: refactor this mess:
     if name=="__main__":
         lines = ['    loadlib P1, "python_group"',
-                 "    .local object builtin"]
-        for builtin in ['abs','cmp','float','hex','int','oct','range']:
-            lines += ["    newsub builtin, .Sub, __builtin___%s0" % builtin,
-                      "    store_lex 0, '%s', builtin" % builtin]
+                 '    find_global P0, "PyBuiltin", "__load__"',
+                 '    invoke',
+                 "    newsub P1, .Sub, __builtin___range0",
+                 "    store_lex 0, 'range', P1"]
         pir.lines = lines + pir.lines
     code =  pir.getCode()
     return code
