@@ -1,7 +1,8 @@
-GOALS FOR PIRATE
-----------------
+-----------------------------
+GOALS FOR PIRATE AND DUTCHMAN
+-----------------------------
 
-1. Full Python Compatibility
+1. Full Python Compatibility 
 
    Implement a complete and up to date versions of python
    and its standard library that runs on the parrot virtual
@@ -30,7 +31,10 @@ GOALS FOR PIRATE
 
       - take advantage of PyPy's type inference engine so
         that scripts can use parrot native types where
-        appropriate
+        appropriate (and as PyPy evolves)
+
+      - set up facilities for manual type annotations
+        (a "typesheet" compiler)
 
       - hand-code the most commonly used sections of the
         standard library (especially the builtin module)
@@ -76,3 +80,4 @@ GOALS FOR PIRATE
         that python doesn't recognize, whereas perl has
         separate namespaces for hashes, arrays, scalars
         and functions)
+
