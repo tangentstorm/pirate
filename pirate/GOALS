@@ -1,0 +1,78 @@
+GOALS FOR PIRATE
+----------------
+
+1. Full Python Compatibility
+
+   Implement a complete and up to date versions of python
+   and its standard library that runs on the parrot virtual
+   machine.
+
+   Therefore, we will do one or more of:
+
+      - expand the code generator to handle all features
+        of python (imports, decorators, generator comprehensions,
+        eval/exec, etc)
+
+      - reimplement the python api for the parrot virtual
+        machine, so that we can simply recompile the python
+        standard library (and other modules like numeric
+        and pygame). [this also addresses goal 4]
+
+      - manually port the python standard library to parrot
+
+2. Significant Speed Improvement
+
+   Parrot has numerous features that should allow python
+   to run much faster (fore example, native types and the
+   register machine architecture) than cPython.
+
+   Therefore, we will do one or more of:
+
+      - take advantage of PyPy's type inference engine so
+        that scripts can use parrot native types where
+        appropriate
+
+      - hand-code the most commonly used sections of the
+        standard library (especially the builtin module)
+        as optimized PMC's.
+
+
+3. Language Enhancements
+
+   Parrot's architecture makes it easy to implement
+   tail calls and serializable continuations, and possibly
+   other features that the python community have asked
+   for but which are hard to implement on the existing
+   virtual machine.
+
+   Therefore we will:
+
+      - experiment with ways to expose these features
+        through extended python syntax and/or libraries
+
+4. Language Interop
+
+   Parrot was conceived as a common platform for many
+   languages, and so a full implementation of python on
+   parrot should allow python programmers to easily take
+   advantage of code written in other languages, and allow
+   users of those other languages to take advantage of
+   libraries written in python.
+
+   Therefore, we will do one or more of the following:
+
+      - restructure pirate so that its parts can be easily
+        reused in other compilers, and support other developers
+        in their efforts to create new parrot compilers.
+
+      - reimplement the python api for the parrot virtual
+        machine, so that we can simply recompile the python
+        standard library (and other modules like numeric
+        and pygame). [this also addresses goal 1]
+
+      - experiment with ways to overcome syntax issues
+        between languages (for example, scheme and ruby
+        both allow you to create function names with characters
+        that python doesn't recognize, whereas perl has
+        separate namespaces for hashes, arrays, scalars
+        and functions)
