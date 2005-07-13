@@ -1,0 +1,84 @@
+<html>
+<head>
+<title>pirate (python on parrot)</title>
+
+<style type="text/css">
+body {
+   background: white;
+   color: black;
+   font-family: arial;
+   text-align:center;
+}
+</style>
+
+</head>
+<body>
+
+<div style="width:600px; text-align:left; margin-left:auto; margin-right:auto">
+<img src="pirate.gif" height="250" width="600"
+     alt="pirate: a python compiler for parrot">
+
+<h1>version 0.01 alpha (8/16/2003)</h1>
+
+<p><b><a href="http://www.python.org/">Python</a></b> is a programming language.<br>
+   <b><a href="http://www.parrotcode.org/">Parrot</a></b> is a virtual machine
+   for running programming langagues.<br>
+   <b>Pirate</b> lets parrot run python.</p>
+
+<p>Right now, pirate supports a good deal of python. The two
+   biggest things that are still missing are classes 
+   (because parrot classes aren't quite done yet)
+   and <code>exec/eval/import</code> (because those
+   things require a compiler -- and without classes, pirate 
+   can't compile itself). None of the builtin functions
+   exist, either, and the types are borrowed from perl. :)</p>
+
+<p>BUT: there's still a lot you can do! For example, parrot
+   is able to run this generator-based <a href="pirate/weightless.py">microtheads demo</a> 
+   and correctly run over 50 small <a href="pirate/PirateTest.py">test cases</a> 
+   covering much of the language.</p>
+</p>
+
+<p>As a special bonus, it currently runs dog slow! The microthreads
+   example runs about 8-9 times slower on pirate than on regular 
+   python. But that's not parrot's fault: the generated 
+   code is <i>completely</i> unoptimized.</p>
+
+<p>Anyway, want to try it out? You'll need:</p>
+<ul>
+  <li><a href="pirate-0.01a.tgz">pirate-0.01a.tgz</a> (22kb)</a></li>
+  <li>the latest parrot <a href="http://dev.perl.org/cvs/">from cvs</a></li>
+  <li>a recent version of python. (I use<a href="http://www.python.org/2.2.3/">2.2.2</a>.
+       Python 1.5.2 will <b>not</b> work)
+  </li>
+</ul>
+
+<p>Want to work on the code? </p>
+<ul>
+<li>See the <a href="pirate/README">README</a> for project goals / cvs access / help wanted / etc</li>
+<li>See the <a href="pirate/GUIDE">GUIDE</a> to learn how the code is laid out.</li>
+<li>You can also <a href="http://pirate.versionhost.com/viewcvs.cgi/pirate/">browse the cvs repository</a></li>
+</ul>
+
+<p><b>Note:</b> looks like this version has an unpassed test case
+   dealing with generators. Didn't mean to check that one in, but
+   since it's there... Anyone want to give it a shot? The solution
+   probably looks something like the PARROT_INLINE() macros in 
+   the microthreads demo.
+</p>
+
+<p>Send feedback to michal (<a href="http://withoutane.com">without an e</a>) wallace
+   at <a href="mailto:michal@sabren.com">michal@sabren.com</a>. Let me know what you
+   think!!</p>
+
+<p>PS, a big thanks to <a href="pirate/CREDITS">everyone 
+   who helped get it this far</a>!!</p>
+
+
+<p><b>Future work:</b> Pirate development is currently 
+stalled, waiting on a working object system for parrot.</p>
+
+</div>
+</div>
+</body>
+</html>
