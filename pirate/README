@@ -81,27 +81,6 @@ If you want write access to cvs, drop me an email at
 michal@sabren.com
 
 
-## running ########################################
-
-Note: the current version of Pirate from CVS requires a current
-version of Parrot from CVS.  When you build Parrot, make sure
-that --prefix is set correctly (e.g., --prefix=`pwd`) when
-you run Configure.pl in order to be able to properly locate
-the dynamically loaded Python library. For example:
-
-   svn co https://svn.perl.org/parrot/trunk parrot
-   cd parrot
-   perl Configure.pl --prefix = `pwd`
-   make 
-
-To (attempt to) run a python script through parrot:
-
-    pirate.py whatever.py
-
-To see the generated parrot code:
-
-    pirate.py -d whatever.py
-
 
 ## pair programming? ##############################
 

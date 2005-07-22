@@ -12,9 +12,23 @@ INSTALLATION
 
 ############
 
-   Install parrot and python. Pirate will currently 
-   run with python 2.2, but will soon require a python 
-   shared library (which probably means 2.3 or above)
+   Install parrot and python. Pirate should work
+   with the latest versions of parrot and any
+   any python version 2.2 or above.
+
+   ## PARROT ##
+
+   When you build Parrot, make sure --prefix is set 
+   correctly (e.g., --prefix=`pwd`) when you run 
+   Configure.pl, so that parrot can properly locate
+   the python PMC's. For example:
+
+   svn co https://svn.perl.org/parrot/trunk parrot
+   cd parrot
+   perl Configure.pl --prefix=`pwd`
+   make 
+
+   ## PYTHON ##
 
    You can compile python 2.3 or above to work as a
    shared library with:
@@ -22,31 +36,8 @@ INSTALLATION
         ./configure --enable-share
         make
    
-
    Once you've got a decent parrot and a decent python, 
    run the tests:
-
-
-############################
-
-COMPILING THE BUILTIN MODULE
-
-############################
-
-
-   Pirate currently requires a precompiled version
-   of the python __builtin__ module. The tests won't
-   run without it, but pirate.py will generate it if
-   it's not there. So the first thing you should do
-   is run this:
-
-   % python pirate.py benchmarks/euclid.py
-   96 64
-   32
-
-   (It doesn't matter what file you run, euclid was
-   just handy, and shows that pirate really works!)
-
 
 
 #################
