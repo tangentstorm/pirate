@@ -270,7 +270,7 @@ class PirateVisitor(object):
         flag = ''
         if r.startswith("u'") or r.startswith('u"'):
            allocate = 1
-           flag = 'u:'
+           flag = 'binary:'
            r=r[1:]
 
         if r.startswith("'") and r.endswith("'"):

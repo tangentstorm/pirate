@@ -7,7 +7,7 @@ def trim(s):
     strips leading indentation from a multi-line string.
     (for dealing with multi-line indented strings)
     """
-    lines = s.split("\n")
+    lines = str(s).split("\n")
     # strip leading blank line:
     if lines[0] == "":
         lines = lines[1:]
@@ -20,7 +20,7 @@ class PirateTest(unittest.TestCase):
 
     ## test support methods ###################
 
-    def run(self, code):
+    def pirate_invoke(self, code):
         return pirate.invoke(trim(code))
 
     def runTest(self, file):
@@ -37,7 +37,7 @@ class PirateTest(unittest.TestCase):
             o.close()
 
         # run the test and compare the results
-        res = self.run(open(file).read()).strip()
+        res = self.pirate_invoke(open(file).read()).strip()
         self.assertEquals(res, open(outfile).read().strip())
 
 
@@ -45,7 +45,7 @@ class PirateTest(unittest.TestCase):
 
     def test_unpack_wrong_size(self):
         try:
-            res = self.run(
+            res = self.pirate_invoke(
                 """
                 a,b = 1,2,3
                 """)
@@ -58,7 +58,7 @@ class PirateTest(unittest.TestCase):
     ## del #######################################
 
     def test_del_name(self):
-        res = self.run(
+        res = self.pirate_invoke(
             """
             x = 1
             del x
@@ -67,7 +67,7 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "Lexical 'x' not found\n")
 
     def test_del_attr(self):
-        res = self.run(
+        res = self.pirate_invoke(
             """
             class C: pass
             C.x = 1
@@ -78,7 +78,7 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "1\nAttributeError: C instance has no attribute 'x'\n")
 
     def test_del_key(self):
-        res = self.run(
+        res = self.pirate_invoke(
             """
             d = {'a':'b'}
             print d['a']
@@ -100,7 +100,7 @@ class PirateTest(unittest.TestCase):
 ## @TODO: fix lambda/tuple syntax bug
 ##
 ##     def test_lambda_syntax_bug(self):
-##         res = self.run(
+##         res = self.pirate_invoke(
 ##             ### the following SHOULD produce
 ##             ### a runtime error saying that
 ##             ### tuples are not callable.
@@ -121,7 +121,7 @@ class PirateTest(unittest.TestCase):
     ## @TODO: top-level pythonic exception handler
 
     def test_raise(self):
-        res = self.run(
+        res = self.pirate_invoke(
             """
             print 'to be or',
             raise 'not to be'
@@ -132,7 +132,7 @@ class PirateTest(unittest.TestCase):
 
 
     def test_try_finally(self):
-        res = self.run(
+        res = self.pirate_invoke(
             """
             try:
                 try:
@@ -151,7 +151,7 @@ class PirateTest(unittest.TestCase):
         self.assertEquals(res, "1 3 5 6")
 
     def test_clear_eh(self):
-        res = self.run(
+        res = self.pirate_invoke(
             """
             try:
                pass
