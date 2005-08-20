@@ -926,14 +926,25 @@ class PirateVisitor(object):
 
     def visitAssName(self, node):
         """
-        As far as I can tell, this node is only used for 'del name'
+        when node.flags == OP_DELETE, it means 'del name'
+        
+        when node.flags == OP_ASSIGN, it's an assignment but
+        as far as I can tell this only actually happens in
+        list comprehensions, eg: lexical 'i' in '[i for i in (1,2,3)]'
         """
-        assert node.flags == "OP_DELETE", "expected AssName to be a del!"
-        pad = self.gensym()
-        name = node.name
-        self.append("peek_pad " + pad)
-        self.append("delete %s['%s']" % (pad, name))
-        if name in self.locals: del self.locals[name]
+        if node.flags == "OP_DELETE":
+            "expected AssName to be a del!"
+            pad = self.gensym()
+            name = node.name
+            self.append("peek_pad " + pad)
+            self.append("delete %s['%s']" % (pad, name))
+            if name in self.locals: del self.locals[name]
+        elif node.flags=="OP_ASSIGN":
+            #@TODO: handle this for list comprehensions
+            pass
+        else:
+            raise NotImplementedError("can't handle %s yet" % node.flags)
+
 
     def visitAssAttr(self, node):
         assert node.flags == "OP_DELETE", "expected AssGetattr to be a del!"
