@@ -1,8 +1,7 @@
 from __future__ import generators
-
 """
-From: Michal
-To: Curt, pirate list
+From: Michal and Curt
+To: pirate list
 
 
 Refactoring Pirate : an example
@@ -58,10 +57,13 @@ class PirateVisitor(object):
     ## in a template:
     ##
     ## (again, real pirate is much more complicated)
+
+    def getLines(self):
+        return self.lines
     
     def getCode(self):
         res  = ".sub __main__ @MAIN\n"
-        res += "\n".join(self.lines) + "\n"
+        res += "\n".join(list(self.getLines())) + "\n"
         res += ".end\n"
         return res
 
@@ -152,10 +154,10 @@ def replaceWith(newClass):
 # (this new version will be called next time
 # we run test())
 import transform
-def simplify(ast):
-    t = Transformer()
+def simplify(tree):
+    t = transform.Transformer()
     t.on(ast.Pass, replaceWith(PassEmitter))
-    return t.apply(ast)
+    return t.apply(tree)
 
 
 
@@ -170,25 +172,182 @@ del PirateVisitor.visitPass
 
 class PirateVisitor(PirateVisitor):
 
-    def visitPass(self, node):
-        emitter = PassEmitter(node)
-        self.lines.append(emit.emitter())
+    def visitPassEmitter(self, node):
+        self.lines.append(node.emit())
 
 
 
+# Only one problem: node.emit() is a
+# generator, not a string, and our lines
+# need to be strings.
+#
+# But we can fix that:
+
+    def getLines(self):
+        return flatten(self.lines)
+            
+        
+# flatten is just a simple function to iterate
+# through the nested generators for us:
+
+from types import GeneratorType
+
+def flatten(series):
+    """
+    take a list that might contain other lists or
+    generators  and flatten it so that it's just
+    one big list
+    """
+    for thing in series:
+        if type(thing) in [list, GeneratorType]:
+            for sub in flatten(thing):
+                yield sub
+        else:
+            yield thing
+
+test()
+
+"""
+So now we can put one of our Emitter nodes in the tree, and
+we can have pirate deal with it correctly. But what happens
+if the Emitter node has children? Somehow, it needs to invoke
+PirateVisitor.
+
+Here's the problem:
+"""
+
+
+class PirateVisitor(PirateVisitor):
+
+    def visitWhile(self, node):
+        # *very* dumbed down: we're not even
+        # actually putting the test in here!!!
+        self.lines.append("while:")
+        self.visit(node.body)
+        self.lines.append("goto while")
+
+
+
+
+def testWhile():
+    pir = compile(simplify(parse("while 1: pass")))
+    assert pir ==\
+"""\
+.sub __main__ @MAIN
+while:
+noop
+goto while
+.end
+""", pir
+
+
+testWhile()
+
+"""
+So far, this works fine. It's no problem to have an old
+Node with an Emitter chld, but if we try this...
+"""
+
+def simplify(tree):
+    t = transform.Transformer()
+    t.on(ast.Pass,  replaceWith(PassEmitter))
+    t.on(ast.While, replaceWith(WhileEmitter))
+    return t.apply(tree)
+
+
+del PirateVisitor.visitWhile
+
+class PirateVisitor(PirateVisitor):
+    def visitWhileEmitter(self, node):
+        self.lines.append(node.emit())
 
 
 """
-
-So what we're doing here is pretty simple in
-principle, but how can we mix this style of
-class with the 
-
-
-Now: how can we tie this scheme into pirate without
-breaking all the tests?
-
+We run into a problem, because we've lost self.visit:
 """
 
+class WhileEmitter(ast.While):
+    def emit(self):
+        yield "while:"
+        self.visit(self.body) ## DOESN'T WORK ANYMORE
+        yield "goto while"
 
+
+"""
+So, really what we need is to make a new call to
+compile()... Except we only want the lines, not
+the code with the full template... So we can
+just break compile() in half:
+"""
+
+def emit(ast):
+    vis = compiler.visitor.ASTVisitor()
+    pir = PirateVisitor()
+    vis.preorder(ast, pir)
+    return pir
+
+def compile(ast): # new version
+    return emit(ast).getCode()
+
+class WhileEmitter(ast.While):
+    def emit(self):
+        yield "while:"        
+        yield emit(self.body).getLines()
+        yield "goto while"
+
+
+# now it works!
+testWhile()
+
+
+"""
+That's basically it. PirateVisitor now looks like this:
+"""
+
+class PirateVisitor(object):
+
+    def __init__(self):
+        self.lines = []
+
+    def getLines(self):
+        return flatten(self.lines)
+    
+    def getCode(self):
+        res  = ".sub __main__ @MAIN\n"
+        res += "\n".join(list(self.getLines())) + "\n"
+        res += ".end\n"
+        return res
+
+    ## our old style visitor methods:
+
+    def visitPrintnl(self, node):
+        self.lines.append('print_newline')
+
+
+    # plus these visitXXXEmitter methods all of
+    # which are EXACTLY the same.
+    #
+    # At some point, all the methods will look
+    # like this, and we can replace PirateVisitor
+    # with a simple dispatch dictionary.
+
+    def visitPassEmitter(self, node):
+        self.lines.append(node.emit())
+
+    def visitWhileEmitter(self, node):
+        self.lines.append(node.emit())
+
+
+# and it still works!
+test()
+testWhile()
+
+
+"""
+From here on out, we just continue replacing the visitXXX
+and expressXXX methods in this fashion.
+
+Anyway, this is the proposal for the pirate refactoring.
+Feedback, questions, and comments are appreciated. 
+"""
 
