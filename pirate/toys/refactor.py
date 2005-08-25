@@ -1,4 +1,10 @@
+from __future__ import generators
+
 """
+From: Michal
+To: Curt, pirate list
+
+
 Refactoring Pirate : an example
 -------------------------------
 
@@ -15,7 +21,7 @@ Current situation
 -------------------------------
 
 Here is a GREALY simplified example of 
-how pirate works.
+how pirate works as of today (Aug 24, 2005):
 """
 
 ## PirateVisitor walks the abstract syntax tree
@@ -43,10 +49,10 @@ class PirateVisitor(object):
     ## defined in the compiler/ast.py module
 
     def visitPrintnl(self, node):
-        self.lines.append('    print_newline')
+        self.lines.append('print_newline')
 
     def visitPass(self, node):
-        self.lines.append('    noop')
+        self.lines.append('noop')
 
     ## when we're done, the whole thing is wrapped
     ## in a template:
@@ -64,9 +70,13 @@ class PirateVisitor(object):
 ## our visitor and compile the source:
 
 import compiler
-def compile(src):
-    compiler.parse(src)
-    ast = compiler.parse(src)
+def parse(src):
+    return compiler.parse(src)
+
+def simplify(ast):
+    return ast # nothing yet
+
+def compile(ast):
     vis = compiler.visitor.ASTVisitor()
     pir = PirateVisitor()
     vis.preorder(ast, pir)
@@ -76,15 +86,17 @@ def compile(src):
 
 ## here's how it looks when it runs:
 
-pir = compile("print; pass")
-assert pir ==\
+def test():
+    pir = compile(simplify(parse("print; pass")))
+    assert pir ==\
 """\
 .sub __main__ @MAIN
-    print_newline
-    noop
+print_newline
+noop
 .end
 """, pir
 
+test()
 
 ##################################################
 
@@ -92,11 +104,91 @@ assert pir ==\
 Refactoring Plan
 -------------------------------
 
-The goal is to refactor pirate so that 
+The goal is to refactor pirate so that the entire compilation
+process happens as a series of tree transformations, right up
+until the end, so that we wind up with a tree that looks very
+much like an AST for PIR.
 
-This is based on 'Phase Two: extract PIR related classes'
-in this email:
+Given the time constraints for the summer of code sponsorship,
+I suggest we focus our energies on an intermediate step:
+extracting individual classes for each visitXXX and expressXXX
+method.
 
-http://cornerhost.com/archives/pirate/2005-July/000038.html
+The result is that each Node from compiler.ast (or at
+least the ones we haven't simplified out) should have
+a corresponding NodeEmitter class:
+
+For example, here's how we can implement "pass":
+"""
+
+from compiler import ast
+class PassEmitter(ast.Pass):
+    def emit(self):
+        yield "noop"
+    
+
 
 """
+In other words, we're creating a new type of node that
+looks just like Pass, but also has an .emit() method.
+
+It's easy to do a search and replace on these in our
+ast, now that we have the transform module:
+
+"""
+
+# this returns a transformer function
+# we can use this over and over again
+def replaceWith(newClass):
+    def func(node):
+        node.__class__ = newClass
+        return node
+    return func
+    
+
+# now override the simplify method by adding
+# some transformations.
+#
+# (this new version will be called next time
+# we run test())
+import transform
+def simplify(ast):
+    t = Transformer()
+    t.on(ast.Pass, replaceWith(PassEmitter))
+    return t.apply(ast)
+
+
+
+# Now we can delete PirateVisitor.visitPass
+# because it will never see a "pass" node:
+#
+# (I'm using del for narrative reasons,
+# but really we'd actually delete the 
+# the old lines)
+del PirateVisitor.visitPass
+
+
+class PirateVisitor(PirateVisitor):
+
+    def visitPass(self, node):
+        emitter = PassEmitter(node)
+        self.lines.append(emit.emitter())
+
+
+
+
+
+"""
+
+So what we're doing here is pretty simple in
+principle, but how can we mix this style of
+class with the 
+
+
+Now: how can we tie this scheme into pirate without
+breaking all the tests?
+
+"""
+
+
+
