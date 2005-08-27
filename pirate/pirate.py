@@ -15,7 +15,8 @@ pirate: python->parrot compiler
 
 # do type inference to unbox locals.
 
-
+from __future__ import generators
+from types import GeneratorType
 import os
 import compiler
 import traceback
@@ -35,6 +36,12 @@ class imclist(list):
     """
     
     def append(self, line, indent=True):
+        #this check allows the PassEmitter to work     
+        if isinstance(line, GeneratorType):
+            tmp = ""
+            for item in line:
+                tmp += str(item)
+            line = tmp    
         is_setline = line.startswith("setline")
         if indent:
             line = "    %-30s"  %line
@@ -108,10 +115,26 @@ class PirateVisitor(object):
         #self.types[type] = index
         #return index
 
+    def flatten(self, series):
+        '''
+        take a list that might contain other lists or
+        generators  and flatten it so that it's just
+        one big list
+        '''
+        for thing in series:
+            if type(thing) in [list, GeneratorType]:
+                for sub in flatten(thing):
+                    yield sub
+            else:
+                yield thing
+                
+    def getLines(self):
+        return self.flatten(self.lines)                
+
     def getCode(self):
         res  = ".sub %s @MAIN\n" % self.name
         res += "    new_pad 0\n"
-        res += "\n".join(self.lines) + "\n"
+        res += "\n".join(self.getLines()) + "\n"#list(self.getLines())) + "\n"
         res += ".end\n"
         res += "\n\n".join([s.getCode() for s in self.subs]) + "\n"
         return res
@@ -121,6 +144,7 @@ class PirateVisitor(object):
             node.lineno != self._last_lineno):
             self._last_lineno = node.lineno
             self.append('setline %i' % node.lineno)
+            
 
 
     def append(self, line, indent=True):
@@ -726,7 +750,7 @@ class PirateVisitor(object):
         # emit code:###############################
         self.set_lineno(node)
         dest = self.gensym()
-        self.listcomps.append(dest)
+        self.listcomps.append(dest)        
         ### ??? lcval = self.gensym()
         # here we create our anonymous list:
         self.append("new %s, %s" % (dest,self.find_type("PyList")))
@@ -735,6 +759,7 @@ class PirateVisitor(object):
         return dest
 
     def visitListCompCore(self, node):
+        #print len(self.listcomps)
         pmc = self.listcomps[-1]
         exp = self.compileExpression(node.expr)
         self.append("push %s, %s" % (pmc, exp))
@@ -940,12 +965,21 @@ class PirateVisitor(object):
 
 
     ##[ control stuctures ]#########################################
-
+    def visitPassEmitter(self, node):
+        self.lines.append(node.emit())
+#SETH
+    def visitWhileEmitter(self, node):
+        self.lines.append(node.emit())
+        #print "************" + str(self.lines) + "&&&&&&&&&"
+        
     def visitWhile(self, node):        
-        self.set_lineno(node)
+        #print self.set_lineno(node)
         _while = self.genlabel("while")
+        #print "_while: " + str(_while)
         _elsewhile = self.genlabel("elsewhile") # sync nums even if no "else"
+        #print "_elsewhile: " + str(_elsewhile)
         _endwhile = self.genlabel("endwhile")
+        #print "_endwhile: " + str(_endwhile)
         self.loops.append((_while, _endwhile))
         
         self.label(_while)
@@ -1038,8 +1072,11 @@ class PirateVisitor(object):
             pass
 
         if nevermind:
-            self.visit(node.expr)
-        else:
+            if isinstance(node.expr, simple.SimpleListComp): 
+                self.compileExpression(node.expr)
+            else:    
+                self.visit(node.expr)
+        else:            
             for line in node.expr.args:
                 assert isinstance(line, ast.Const), "can only INLINE strings"
                 self.append(line.value)
@@ -1289,46 +1326,95 @@ class PirateSubVisitor(PirateVisitor):
         result = self.compileExpression(node.value, allocate=1)
 
         self.append(".yield (" + result + ")")
+##########EMITTERS#############################
+class PassEmitter(ast.Pass):
+    def emit(self):
+        yield "noop"        
+        
+class WhileEmitter(ast.While):
+    def emit(self):
+        a = PirateVisitor("__main__")
+        print "hmm234932478723t4823g"
+        yield "test"
+        yield "test2"
+        yield a.set_lineno(self)
+        yield "test3"        
+        yield Dispatch(self.body).getLines()
+        yield "test4"        
+        
+'''
+        self.set_lineno(node)
+        _while = self.genlabel("while")
+        _elsewhile = self.genlabel("elsewhile") # sync nums even if no "else"
+        _endwhile = self.genlabel("endwhile")
+        self.loops.append((_while, _endwhile))
+        
+        self.label(_while)
+        if node.else_:
+            self.unlessExpression(node.test, _elsewhile)
+            self.visit(node.body)
+            self.goto(_while)
+            self.label(_elsewhile, optional=True)
+            self.visit(node.else_)
+        else:
+            self.unlessExpression(node.test, _endwhile)
+            self.visit(node.body)
+            self.goto(_while)
 
-                
+        self.label(_endwhile, optional=True)
+        self.loops.pop()
+
+'''
+###############################################                
 ## module interface ###############################################
-
+    
 import time
 import transform
+#import emitters
 HEAD=\
 '''
 # generated by pirate on %s
 ''' % time.asctime()
 FOOT=""
 
+def replaceWith(newClass):
+    def func(node):
+        node.__class__ = newClass
+        return node
+    return func
+
 def parse(src):
     return compiler.parse(src)
-
+#SETH
 def simplify(ast):
     t = transform.Transformer()
     t.on(compiler.ast.ListComp, simple.simplifyListComp)
+    t.on(compiler.ast.Pass, replaceWith(PassEmitter))
+    #t.on(compiler.ast.While, replaceWith(WhileEmitter))
     #t.on(compiler.ast.Discard, python.expressListComp)
     #t.on(compiler.ast.ListComp, python.expressListComp)
     #t.on(compiler.ast.Function, python.convertFunction)
     ast = t.apply(ast)
     return ast
                 
-def compile(ast, name="__main__"):
+
+def Dispatch(ast):
     vis = compiler.visitor.ASTVisitor()
-    pir = PirateVisitor(name)
+    pir = PirateVisitor("__main__")
     vis.preorder(ast, pir)
-    if name=="__main__":
-        pre  = ["    loadlib P1, 'python_group'",
-                "    push_eh __py_catch"]
-        post = ["    .return ()",
-                "__py_catch:",
-                "    print_item P5",
-                '    print_newline']
-        pir.lines = pre + ["#"] + pir.lines + ["#"] + post
-    code =  pir.getCode()
-    return code
-
-
+    if isinstance(ast, compiler.ast.Module):
+            pre  = ["    loadlib P1, 'python_group'",
+                    "    push_eh __py_catch"]
+            post = ["    .return ()",
+                    "__py_catch:",
+                    "    print_item P5",
+                    '    print_newline']
+            pir.lines = pre + ["#"] + pir.lines + ["#"] + post
+    return pir
+                    
+def compile(ast, name="__main__"):
+    return Dispatch(simplify(ast)).getCode()
+    
 def line_nos(seq):
     return [(i+1, seq[i]) for i in range(len(seq))]
 
@@ -1357,7 +1443,7 @@ if __name__=="__main__":
         # dump or run?
         if "-d" in sys.argv:
             print HEAD
-            print compile(src)
+            print compile(compiler.parse(src))
             print FOOT
         else:
             for line in invoke(src, trace=("-t" in sys.argv)):
@@ -1366,3 +1452,4 @@ if __name__=="__main__":
         print __doc__
         sys.exit()
         
+#SETH 
