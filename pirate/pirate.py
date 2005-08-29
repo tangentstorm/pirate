@@ -23,6 +23,7 @@ import traceback
 import simple
 from compiler import ast
 
+
 if not hasattr(__builtins__,'enumerate'):
     def enumerate(seq):
         return [(i,seq[i]) for i in range(len(seq))]
@@ -36,20 +37,23 @@ class imclist(list):
     """
     
     def append(self, line, indent=True):
-        #this check allows the PassEmitter to work     
-        if isinstance(line, GeneratorType):
-            tmp = ""
-            for item in line:
-                tmp += str(item)
-            line = tmp    
-        is_setline = line.startswith("setline")
-        if indent:
-            line = "    %-30s"  %line
-            if not line.isspace():
-                if not is_setline: # work round IMCC parsing bug
-                    line = line + "# %s"  % self.find_linenumber()
-        super(imclist, self).append(line)
-        
+        #this check allows the emit()s to work     
+        if line is not None:
+            if isinstance(line, GeneratorType):
+                tmp = ""
+                for item in line:
+                    tmp += str(item)
+                line = tmp    
+            if isinstance(line, tuple):
+                line = line[0]
+            is_setline = line.startswith("setline")
+            if indent:
+                line = "    %-30s"  %line
+                if not line.isspace():
+                    if not is_setline: # work round IMCC parsing bug
+                        line = line + "# %s"  % self.find_linenumber()
+            super(imclist, self).append(line)
+            
     def find_linenumber(self):
         """
         python black magic. :)
@@ -94,8 +98,9 @@ class PirateVisitor(object):
         self.counter[prefix] += 1
         sym = "%s%i" % (prefix, self.counter[prefix]) 
         if type and not prefix.startswith("$"):  
-            self.append(".local %s %s" % (type, sym))
-        return sym
+            #self.append (".local %s %s" % (type, sym))
+            return (".local %s %s" % (type, sym), sym)
+        return (None,sym)
 
     def genlabel(self, prefix):
         """
@@ -116,11 +121,11 @@ class PirateVisitor(object):
         #return index
 
     def flatten(self, series):
-        '''
+        """
         take a list that might contain other lists or
         generators  and flatten it so that it's just
         one big list
-        '''
+        """
         for thing in series:
             if type(thing) in [list, GeneratorType]:
                 for sub in flatten(thing):
@@ -143,46 +148,67 @@ class PirateVisitor(object):
         if (node.lineno is not None and
             node.lineno != self._last_lineno):
             self._last_lineno = node.lineno
-            self.append('setline %i' % node.lineno)
+            #self.append('setline %i' % node.lineno)
+            return ('setline %i' % node.lineno)
             
 
 
     def append(self, line, indent=True):
+        #text1, text2, text3 = None
         if self.pending_unless:
             self.seen_labels.append(self.pending_unless[1])
+            #text1 = self.pending_unless[1]
             self.lines.append("unless %s goto %s" % self.pending_unless)
+            #text2 = ("unless %s goto %s" % self.pending_unless) 
             self.pending_unless = None
         if self.reachable:
             self.lines.append(line, indent)
+            #text3 = line, indent
+        #return text1, text2, text3
 
     def label(self, name, optional=False):
+        selflinesappend = None
+        selfappend = None
         if self.pending_unless:
             if self.pending_unless[1]!=name:
                 self.seen_labels.append(self.pending_unless[1])
-                self.lines.append("unless %s goto %s" % self.pending_unless)
+                #self.lines.append("unless %s goto %s" % self.pending_unless)
+                selflinesappend = "unless %s goto %s" % self.pending_unless
             self.pending_unless = None
-        if optional and not name in self.seen_labels: return
+        if optional and not name in self.seen_labels: 
+            return selflinesappend, None, None
         self.reachable = True
-        self.append("%s:" % name, indent=False)
+        #self.append("%s:" % name, indent=False)
+        selfappend = "%s:" % name        
         #self.types = {}
         self.locals = {}
+        indent = False
+        return selflinesappend, selfappend, indent
 
     def unless(self, expression, label):
+        text = None
         if self.pending_unless:
             self.seen_labels.append(self.pending_unless[1])
-            self.append("unless %s goto %s" % self.pending_unless)
+            #self.append("unless %s goto %s" % self.pending_unless)
+            text =  "unless %s goto %s" % self.pending_unless
         self.pending_unless = (expression, label)
-
+        return text
+        
     def goto(self, label):
-        if not self.reachable: return
+        if not self.reachable: return None, None
         self.seen_labels.append(label)
         if self.pending_unless:
             cond = self.pending_unless[0]
             self.pending_unless = None
-            self.append("if %s goto %s" % (cond, label))
+            #self.append("if %s goto %s" % (cond, label))
+            return "if %s goto %s" % (cond, label), 1
         else:
-            self.append("goto " + label)
-            self.reachable=False
+            
+            #self.append("goto " + label)
+            #self.reachable=False
+            return "goto " + label, 0
+            #self.append("goto " + label)
+            
 
     def bindLocal(self, name, value):
         self.locals[name] = value
@@ -191,17 +217,24 @@ class PirateVisitor(object):
         return "store_lex  0, '%s', %s" % (name, value)
 
     def lookupName(self, name):
+        text = ""
         if name in self.locals:
             dest = self.locals[name]
             if not dest.startswith('$'):
-                dest = self.gensym()
-                self.append("%s = %s" % (dest, self.locals[name]))
+                regtext, dest = self.gensym()
+                if regtext is not None:
+                    self.append(regtext)
+                text = "%s = %s" % (dest, self.locals[name])
+                #self.append("%s = %s" % (dest, self.locals[name]))
                 self.locals[name] = dest
         else:
-            dest = self.gensym()
-            self.append("find_lex %s, '%s'" % (dest, name))
+            regtext, dest = self.gensym()
+            if regtext is not None:
+                self.append(regtext)
+            text = "find_lex %s, '%s'" % (dest, name)    
+            #self.append("find_lex %s, '%s'" % (dest, name))
             self.locals[name] = dest
-        return dest
+        return dest, text
     ##[ expression compiler ]######################################
     
     def compileExpression(self, node, allocate=0):
@@ -311,7 +344,9 @@ class PirateVisitor(object):
         if isinstance(node.value,long): r = '"' + r[:-1] + '"'
 
         if allocate>0 or (allocate==-1 and r.startswith('"')):
-            dest = self.gensym()
+            regtext, dest = self.gensym()
+            if regtext is not None:
+                self.append(regtext)            
             self.append("new %s, %s" % (dest,self.find_type(self.constMap[t])))
             self.append("%s = %s%s" % (dest, flag, r))
             return dest
@@ -320,8 +355,10 @@ class PirateVisitor(object):
 
 
     def expressDict(self, node, allocate):
-        self.set_lineno(node)
-        dest = self.gensym()
+        self.append(self.set_lineno(node))
+        regtext, dest = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
         self.append("new %s, %s" % (dest,self.find_type("PyDict")))
         if node.items:
             for k,v in node.items:
@@ -336,7 +373,9 @@ class PirateVisitor(object):
         base = self.compileExpression(node.expr, allocate=-1)
 
         for sub in node.subs[:-1]:
-            temp = self.gensym()
+            regtext, temp = self.gensym()
+            if regtext is not None:
+                self.append(regtext)
             sub = self.compileExpression(sub, allocate=-1)
             self.append("%s = %s[%s]" % (temp, base, sub))
             base = temp
@@ -350,16 +389,20 @@ class PirateVisitor(object):
         elif node.flags=="OP_ASSIGN":
             return slot
         else:
-            temp = self.gensym()
+            regtext, temp = self.gensym()
+            if regtext is not None:
+                self.append(regtext)
             self.append("%s=%s" % (temp, slot))
             return temp
 
 
     def expressGetattr(self, node, allocate):
-        dest = self.gensym()
+        regtext, dest = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
         attr = node.attrname
 
-        self.set_lineno(node)
+        self.append(self.set_lineno(node))
         obj = self.compileExpression(node.expr, allocate=1)
         self.append("getattribute %s, %s, '%s'" % (dest, obj, attr))
 
@@ -367,11 +410,14 @@ class PirateVisitor(object):
     
         
     def nameExpression(self, node, allocate):
-        dest = self.lookupName(node.name)
+        dest, text = self.lookupName(node.name)
+        self.append(text)
         return dest
 
     def listExpression(self, expr, allocate):
-        dest = self.gensym()
+        regtext, dest = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
         self.append("new %s, %s" % (dest,self.find_type("PyList")))
         for item in expr.nodes:
             sym = self.compileExpression(item)
@@ -379,7 +425,9 @@ class PirateVisitor(object):
         return dest
 
     def tupleExpression(self, expr, allocate):
-        dest = self.gensym()
+        regtext, dest = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
         self.append("new %s, %s" % (dest,self.find_type("PyTuple")))
         self.append("%s=%d" % (dest,len(expr.nodes)))
         for i in range(0,len(expr.nodes)):
@@ -400,8 +448,12 @@ class PirateVisitor(object):
     }
 
     def backquote(self, node, allocate):
-        dest = self.gensym()
-        temp = self.gensym("$S")
+        regtext, dest = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
+        regtext, temp = self.gensym("$S")
+        if regtext is not None:
+            self.append(regtext)        
         value = self.compileExpression(node.expr, allocate=1)
         self.append("get_repr %s, %s" % (temp, value))
         self.append("new %s, %s" % (dest,self.find_type("PyString")))
@@ -409,7 +461,9 @@ class PirateVisitor(object):
         return dest
 
     def expressUnary(self, node, allocate):
-        dest = self.gensym()
+        regtext, dest = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
         value = self.compileExpression(node.expr, allocate=-1)
         op = self.unaryOps[node.__class__]
         self.append("new %s, %s" % (dest,self.find_type("PyObject")))
@@ -428,7 +482,9 @@ class PirateVisitor(object):
         value = self.compileExpression(node.nodes[0], allocate=1)
         for n in node.nodes[1:]:
             next = self.compileExpression(n, allocate=-1)
-            tmp = self.gensym()
+            regtext, tmp = self.gensym()
+            if regtext is not None:
+                self.append(regtext)
             self.append("new %s, %s" % (tmp,self.find_type("PyObject")))
             self.append("%s = %s %s %s" % (tmp, value, op, next))
             value = tmp
@@ -448,7 +504,9 @@ class PirateVisitor(object):
     }
         
     def infixExpression(self, node, allocate):
-        dest = self.gensym()
+        regtext, dest = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
         self.append("new %s, %s" % (dest,self.find_type("PyObject")))
         lside = self.compileExpression(node.left, allocate=1)
         rside = self.compileExpression(node.right, allocate=-1)
@@ -472,7 +530,8 @@ class PirateVisitor(object):
 
     def unlessExpression(self, test, label):
         "optimize simple if statements"
-
+        appendedCode = []
+        appendedLines = []
         if isinstance(test, ast.Compare):
 
             op, code = test.ops[0]
@@ -481,14 +540,19 @@ class PirateVisitor(object):
             if op not in ("in","not in","is","is not"):
                 symL = self.compileExpression(test.expr, allocate=1)
                 symR = self.compileExpression(code)
-                self.unless("%s %s %s" % (symL, op, symR), label)
+                #self.append(self.unless("%s %s %s" % (symL, op, symR), label))
+                appendedCode.append(self.unless("%s %s %s" % (symL, op, symR), label))
             else:
                 testvar = self.compileExpression(test)
-                self.unless(testvar, label)
+                #self.append(self.unless(testvar, label))
+                appendedCode.append(self.unless(testvar, label))
 
         elif isinstance(test, ast.Const):
-            if not test.value: 
-                self.goto(label)
+            if not test.value:
+                text, tf = self.goto(label) 
+                appendedCode.append([text,tf])
+                #if not tf:
+                #    self.reachable = false 
 
         elif isinstance(test, ast.And):
             for node in test.nodes:
@@ -500,18 +564,36 @@ class PirateVisitor(object):
             for node in test.nodes[:-1]:
                 orlabel = self.genlabel("or")
                 self.unlessExpression(node, orlabel)
-                self.goto(thenlabel)
-                self.label(orlabel, optional=True)
+                text, tf = self.goto(thenlabel)
+                appendedCode.append(text, tf)
+                #if not tf:
+                #    self.reachable = False
+                #self.label(orlabel, optional=True)
+                selflinesappend, selfappend, indent = self.label(orlabel, optional=True)
+                if selflinesappend is not None:
+                    appendedLines.append(selflinesappend)
+                if selfappend is not None:
+                    appendedCode.append(selfappend, indent)
             self.unlessExpression(test.nodes[-1], label)
-            self.label(thenlabel, optional=True)
+            selflinesappend, selfappend, indent = self.label(thenlabel, optional=True)
+            if selflinesappend is not None:
+                appendedlines.append(selflinesappend)
+            if selfappend is not None:
+                appendedCode.append(selfappend, indent)
+            #self.label(thenlabel, optional=True)
 
         else:
             testvar = self.compileExpression(test)
-            self.unless(testvar, label)
+            #self.append(self.unless(testvar, label))
+            appendedCode.append(self.unless(testvar, label))
+        
+        return appendedCode, appendedLines
         
     def compareExpression(self, expr, allocate):
         assert len(expr.ops) == 1, "@TODO: multi-compare not working yet"
-        dest = self.gensym()
+        regtext, dest = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
         # get left side:
         symL = self.compileExpression(expr.expr, allocate=1)
 
@@ -524,12 +606,16 @@ class PirateVisitor(object):
         self.append("new %s, %s" % (dest,self.find_type("PyBoolean")))
 
         if op in self.compOps:
-            temp = self.gensym("$I")
+            regtext, temp = self.gensym("$I")
+            if regtext is not None:
+                self.append(regtext)            
             self.append("%s %s, %s, %s" % (self.compOps[op], temp, symL, symR))
             self.append("%s = %s" % (dest, temp))
         else:
             assert op in ["in","not in"]
-            temp = self.gensym("$I")
+            regtext, temp = self.gensym("$I")
+            if regtext is not None:
+                self.append(regtext)
             self.append("exists %s, %s[%s]" % (temp, symR, symL))
             self.append("%s = %s" % (dest, temp))
             if op == "not in":
@@ -547,7 +633,9 @@ class PirateVisitor(object):
     def logicExpression(self, expr, allocate):
         operator = self.logicOps[expr.__class__]
         if operator == "!":            
-            dest = self.gensym()
+            regtext, dest = self.gensym()
+            if regtext is not None:
+                self.append(regtext)
             tmp = self.compileExpression(expr.expr, allocate=1)
             self.append("new %s, %s" % (dest, self.find_type("PyBoolean")))
             self.append("not %s, %s" % (dest,tmp))
@@ -556,15 +644,30 @@ class PirateVisitor(object):
             label = self.genlabel("shortcircuit")
             for right in expr.nodes[1:]:
                 if operator=='and':
-                    self.unless(dest, label)
+                    self.append(self.unless(dest, label))
                 else:
                     orlabel = self.genlabel("or")
-                    self.unless(dest, orlabel)
-                    self.goto(label)
-                    self.label(orlabel)
+                    self.append(self.unless(dest, orlabel))                    
+                    text, tf = self.goto(label)
+                    self.append(text)
+                    if not tf:
+                        self.reachable = False
+                    selflinesappend, selfappend, indent = self.label(orlabel)
+                    if selflinesappend is not None:
+                        self.lines.append(selflinesappend)
+                    if selfappend is not None:
+                        self.append(selfappend, indent)        
+                    #self.goto(label)
+                    #self.label(orlabel)
                 tmp = self.compileExpression(right, allocate=1)
                 self.append("%s = %s" % (dest, tmp))
-            self.label(label)
+            selflinesappend, selfappend, indent = self.label(label)
+            if selflinesappend is not None:
+                self.lines.append(selflinesappend)
+            if selfappend is not None:
+                self.append(selfappend, indent)        
+
+            #self.label(label)
         return dest
 
     def expressSlice(self, lower, upper):
@@ -572,7 +675,9 @@ class PirateVisitor(object):
         if lower:
             lower = self.compileExpression(lower)
             if not lower.isdigit():
-                temp = self.gensym("$I")
+                regtext, temp = self.gensym("$I")
+                if regtext is not None:
+                    self.append(regtext)
                 self.append("%s = %s" % (temp, lower))
                 lower = temp
 
@@ -580,7 +685,9 @@ class PirateVisitor(object):
         if upper:
             upper = self.compileExpression(upper)
             if not upper.isdigit():
-                temp = self.gensym("$I")
+                regtext, temp = self.gensym("$I")
+                if regtext is not None:
+                    self.append(regtext)
                 self.append("%s = %s" % (temp, upper))
                 upper = temp
 
@@ -596,7 +703,9 @@ class PirateVisitor(object):
         assert node.flags == "OP_APPLY"
         list = self.compileExpression(node.expr, allocate=-1)
         slice = self.expressSlice(node.lower, node.upper)
-        dest = self.gensym()
+        regtext, dest = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
         self.append("%s = %s[%s]" % (dest,list,slice))
         return dest
 
@@ -604,7 +713,9 @@ class PirateVisitor(object):
         assert node.flags == "OP_ASSIGN"
         list = self.compileExpression(node.expr, allocate=-1)
         slice = self.expressSlice(node.lower, node.upper)
-        dest = self.gensym()
+        regtext, dest = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
         self.append("%s[%s] = %s" % (list,slice,value))
         return dest
 
@@ -631,7 +742,9 @@ class PirateVisitor(object):
             if node.star_args and not args:
                 argx = self.compileExpression(node.star_args)
             else:
-                argx = self.gensym()
+                regtext, argx = self.gensym()
+                if regtext is not None:
+                    self.append(regtext)                
                 self.append("new %s, %s" % (argx,self.find_type("PyList")))
 
                 for arg in args:
@@ -644,7 +757,9 @@ class PirateVisitor(object):
             if node.dstar_args and not keywords:
                 keyx = self.compileExpression(node.dstar_args)
             else:
-                keyx = self.gensym()
+                regtext, keyx = self.gensym()
+                if regtext is not None:
+                    self.append(regtext)
                 self.append("new %s, %s" % (keyx,self.find_type("PyDict")))
 
                 if node.dstar_args:
@@ -655,7 +770,9 @@ class PirateVisitor(object):
                     self.append("%s['%s']=%s" % (keyx, name, value))
 
             if sub.find('.')>=0:
-                tmp = self.gensym()
+                regtext, tmp = self.gensym()
+                if regtext is not None:
+                    self.append(regtext)                
                 args = tuple([tmp]+sub.split('.'))
                 self.append("getattribute %s, %s, '%s'" % args)
                 sub = tmp
@@ -664,7 +781,9 @@ class PirateVisitor(object):
             sub = sub + ".__call__"
 
         if allocate>-2:
-            dest = self.gensym()
+            regtext, dest = self.gensym()
+            if regtext is not None:
+                self.append(regtext)
             self.append("%s=%s(%s)" % (dest,sub,",".join(args)))
         else:
             dest = ''
@@ -679,11 +798,13 @@ class PirateVisitor(object):
 
 
     def genFunction(self, node,  name, allocate=1):
-        self.set_lineno(node)
+        self.append(self.set_lineno(node))
 
         # functions are always anonymous, so make fake names
         sub = self.genlabel("_" + str(name))
-        ref = self.gensym()
+        regtext, ref = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
 
         # but sometimes they have a name bound to them (def vs lambda):
         isLambda = not hasattr(node, "name")
@@ -728,7 +849,9 @@ class PirateVisitor(object):
             self.append("%s[%s] = '%s'" % (ref, i, arg))
 
         if node.defaults:
-            defaults = self.gensym()
+            regtext, defaults = self.gensym()
+            if regtext is not None:
+                self.append(regtext)            
             self.append("new %s, %s" % (defaults, self.find_type("PyList")))
             for (i,value) in enumerate(node.defaults):
                 self.append("%s[%s] = %s" % 
@@ -748,8 +871,10 @@ class PirateVisitor(object):
 
     def expressSimpleListComp(self, node, allocate):
         # emit code:###############################
-        self.set_lineno(node)
-        dest = self.gensym()
+        self.append(self.set_lineno(node))
+        regtext, dest = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
         self.listcomps.append(dest)        
         ### ??? lcval = self.gensym()
         # here we create our anonymous list:
@@ -799,24 +924,53 @@ class PirateVisitor(object):
         for test, body in node.tests:
 
             # if not true, goto _elif
-            self.set_lineno(test)
+            self.append(self.set_lineno(test))
             _elif = labels.pop()
+            appendedCode, appendedLines = self.unlessExpression(test, _elif)
+            if len(appendedCode) > 0:
+                for item in appendedCode:
+                    if isinstance(item, list):
+                        self.append(item[0])
+                        if not item[1]:      
+                            self.reachable = False
+                    else:
+                        self.append(item)
+            if len(appendedLines) > 0:
+                for item in appendedLines:
+                    self.lines.append(item)         
 
-            self.unlessExpression(test, _elif)
+            #self.unlessExpression(test, _elif)
             
             # do it and goto _endif
             self.visit(body)
             if _elif <> _endif:
-                self.goto(_endif)
+                text, tf = self.goto(_endif)
+                self.append(text)
+                if not tf:
+                    self.reachable = False
+                
+                #self.append(self.goto(_endif))
             
             # _elif: (next test or pass through to else)
-            self.label(_elif, optional=True)
+            selflinesappend, selfappend, indent = self.label(_elif, optional=True)
+            if selflinesappend is not None:
+                self.lines.append(selflinesappend)
+            if selfappend is not None:
+                self.append(selfappend, indent)
+
+            #self.label(_elif, optional=True)
 
         # else:
         if node.else_:
-            self.set_lineno(node.else_)
+            self.append(self.set_lineno(node.else_))
             self.visit(node.else_)
-            self.label(_endif, optional=True)
+            selflinesappend, selfappend, indent = self.label(_endif, optional=True)
+            if selflinesappend is not None:
+                self.lines.append(selflinesappend)
+            if selfappend is not None:
+                self.append(selfappend, indent)
+
+            #self.label(_endif, optional=True)
 
 
     ##[ assignment ]################################################
@@ -891,7 +1045,9 @@ class PirateVisitor(object):
                 ## this handles l,l,l=r and l,l,l=r()
                 ## @TODO: compare len(lside) against rside.elements()
                 for (i, node) in enumerate(lside):
-                    extract = self.gensym()
+                    regtext, extract = self.gensym()
+                    if regtext is not None:
+                        self.append(regtext)                    
                     self.append("%s = %s[%s]" % (extract, rside[0], i))
                     self.assign(node, extract)
             else:
@@ -933,7 +1089,9 @@ class PirateVisitor(object):
         """
         if node.flags == "OP_DELETE":
             "expected AssName to be a del!"
-            pad = self.gensym()
+            regtext, pad = self.gensym()
+            if regtext is not None:
+                self.append(regtext)            
             name = node.name
             self.append("peek_pad " + pad)
             self.append("delete %s['%s']" % (pad, name))
@@ -973,7 +1131,7 @@ class PirateVisitor(object):
         #print "************" + str(self.lines) + "&&&&&&&&&"
         
     def visitWhile(self, node):        
-        #print self.set_lineno(node)
+        self.append(self.set_lineno(node))
         _while = self.genlabel("while")
         #print "_while: " + str(_while)
         _elsewhile = self.genlabel("elsewhile") # sync nums even if no "else"
@@ -982,24 +1140,64 @@ class PirateVisitor(object):
         #print "_endwhile: " + str(_endwhile)
         self.loops.append((_while, _endwhile))
         
-        self.label(_while)
+        #self.label(_while)
+        selflinesappend, selfappend, indent = self.label(_while)
+        if selflinesappend is not None:
+            self.lines.append(selflinesappend)
+        if selfappend is not None:
+            self.append(selfappend, indent)
         if node.else_:
-            self.unlessExpression(node.test, _elsewhile)
+            appendedCode, appendedLines = self.unlessExpression(node.test, _elsewhile)
+            if len(appendedCode) > 0:
+                for item in appendedCode:
+                    if isinstance(item, list):
+                        self.append(item[0])
+                        if not item[1]:      
+                            self.reachable = False
+                    else:
+                        self.append(item)
+            if len(appendedLines) > 0:
+                for item in appendedLines:
+                    self.lines.append(item)         
             self.visit(node.body)
-            self.goto(_while)
-            self.label(_elsewhile, optional=True)
+            text, tf = self.goto(_while)
+            self.append(text)
+            if not tf:
+                self.reachable = False
+            selflinesappend, selfappend, indent = self.label(_elsewhile, optional=True)
+            if selflinesappend is not None:
+                self.lines.append(selflinesappend)
+            if selfappend is not None:
+                self.append(selfappend, indent)            
             self.visit(node.else_)
         else:
-            self.unlessExpression(node.test, _endwhile)
+            appendedCode, appendedLines = self.unlessExpression(node.test, _endwhile)
+            if len(appendedCode) > 0:
+                for item in appendedCode:
+                    if isinstance(item, list):
+                        self.append(item[0])
+                        if not item[1]:      
+                            self.reachable = False
+                    else:
+                        self.append(item)
+            if len(appendedLines) > 0:
+                for item in appendedLines:
+                    self.lines.append(item)
             self.visit(node.body)
-            self.goto(_while)
-
-        self.label(_endwhile, optional=True)
+            text, tf = self.goto(_while)
+            self.append(text)
+            if not tf:
+                self.reachable = False
+        selflinesappend, selfappend, indent = self.label(_endwhile, optional=True)
+        if selflinesappend is not None:
+            self.lines.append(selflinesappend)
+        if selfappend is not None:
+            self.append(selfappend, indent)        
         self.loops.pop()
 
 
     def visitFor(self, node):
-        self.set_lineno(node)
+        self.append(self.set_lineno(node))
         _for = self.genlabel("for")
         _endfor = self.genlabel("endfor")
         _elsefor = self.genlabel("elsefor")
@@ -1009,19 +1207,30 @@ class PirateVisitor(object):
 
         # first get the list
         forlist = self.compileExpression(node.list, allocate=1)
-        iter = self.gensym()
+        regtext, iter = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
         self.append("%s = iter %s" % (iter, forlist))
 
         # get the next item (also where "continue" jumps to)
-        item = self.gensym()
-        self.label(_for)
-        self.unless(iter, _elsefor)
+        regtext, item = self.gensym()
+        if regtext is not None:
+            self.append(regtext)        
+        selflinesappend, selfappend, indent = self.label(_for)
+        if selflinesappend is not None:
+            self.lines.append(selflinesappend)
+        if selfappend is not None:
+            self.append(selfappend, indent)
+        #self.label(_for)
+        self.append(self.unless(iter, _elsefor))
         self.append("%s = shift %s" % (item, iter))
 
         if isinstance(node.assign, ast.AssTuple):
             # todo: throw something if len(node.assign.nodes) != len(item)
             for (i, name) in enumerate(node.assign.nodes):
-                extract = self.gensym()
+                regtext, extract = self.gensym()
+                if regtext is not None:
+                    self.append(regtext)                
                 self.append("%s = %s[%s]" % (extract, item, i))
                 self.assign(name, extract)
         else:
@@ -1031,30 +1240,52 @@ class PirateVisitor(object):
         self.visit(node.body)
 
         # loop
-        self.goto(_for)
+        text, tf = self.goto(_for)
+        self.append(text)
+        if not tf:
+            self.reachable = False
+        
+        #self.append(self.goto(_for))
 
         # else: this is where we go if the loop ends with no "break"
         self.loops.pop() # no longer part of the loop
         if node.else_:
-            self.label(_elsefor, optional=True)
+            selflinesappend, selfappend, indent = self.label(_elsefor, optional=True)
+            if selflinesappend is not None:
+                self.lines.append(selflinesappend)
+            if selfappend is not None:
+                self.append(selfappend, indent)        
+            
+            #self.label(_elsefor, optional=True)
             self.visit(node.else_)
             
         # end
-        self.label(_endfor, optional=True)
+        selflinesappend, selfappend, indent = self.label(_endfor, optional=True)
+        if selflinesappend is not None:
+            self.lines.append(selflinesappend)
+        if selfappend is not None:
+            self.append(selfappend, indent)        
+
+        #self.label(_endfor, optional=True)
         
 
 
 
     def visitBreak(self, node):
         assert self.loops, "break outside of loop" # SyntaxError
-        self.goto(self.loops[-1][1])
-
+        text, tf = self.goto(self.loops[-1][1])
+        self.append(text)
+        if not tf:
+            self.reachable = False
 
     def visitContinue(self, node):
         assert self.loops, "continue outside of loop" # SyntaxError
-        self.goto(self.loops[-1][0])
+        text, tf = self.goto(self.loops[-1][0])
+        self.append(text)
+        if not tf:
+            self.reachable = False
 
-
+    
     def visitCallFunc(self, node):
         # visited when a function is called as a subroutine
         # (not as part of a larger expression or assignment)
@@ -1110,9 +1341,11 @@ class PirateVisitor(object):
             return
 
         assert not (node.expr3), "3 arg raises not supported"
-        self.set_lineno(node)
+        self.append(self.set_lineno(node))
 
-        exceptsym = self.gensym()
+        regtext, exceptsym = self.gensym()
+        if regtext is not None:
+            self.append(regtext)        
 
         if node.expr2:
             type = self.compileExpression(node.expr1)
@@ -1137,7 +1370,7 @@ class PirateVisitor(object):
 
 
     def visitTryExcept(self, node):
-        self.set_lineno(node)
+        self.append(self.set_lineno(node))
         assert len(node.handlers)==1, "@TODO: only one handler for now"
         # assert not node.else_, "@TODO: try...else not implemented"
         catch = self.genlabel("catch")
@@ -1146,63 +1379,108 @@ class PirateVisitor(object):
         self.visit(node.body)
         if node.else_: self.visit(node.else_)
         self.append("clear_eh")
-        self.goto(endtry)
-        self.label(catch)
+        text, tf = self.goto(endtry)
+        self.append(text)
+        if not tf:
+            self.reachable = False
+        selflinesappend, selfappend, indent = self.label(catch)
+        if selflinesappend is not None:
+            self.lines.append(selflinesappend)
+        if selfappend is not None:
+            self.append(selfappend, indent)        
+        #self.goto(endtry)
+        #self.label(catch)
         for hand in node.handlers:
             expr, target, body = hand
             prev_exception = self.exception
-            self.exception = self.gensym()
+            regtext, self.exception = self.gensym()
+            if regtext is not None:
+                self.append(regtext)            
             self.append("%s = P5" % self.exception)
             if expr:
                 expr = self.compileExpression(expr)
                 expr = "%s.__match__(%s, %s)" % (expr, expr, self.exception)
                 if target:
-                    tmp = self.gensym()
+                    regtext, tmp = self.gensym()
+                    if regtext is not None:
+                        self.append(regtext)                    
                     self.append("%s = %s" % (tmp,expr))
                     self.assign(target,tmp)
                 else:
                     self.append(expr)
             self.visit(body)
             self.exception = prev_exception
-        self.label(endtry, optional=True)
+        selflinesappend, selfappend, indent = self.label(endtry, optional=True)
+        if selflinesappend is not None:
+            self.lines.append(selflinesappend)
+        if selfappend is not None:
+            self.append(selfappend, indent)        
+        #self.label(endtry, optional=True)
 
                 
         
     def visitTryFinally(self, node):
         # how do try/finally and continuations interact?
         # this is a hard question and should be brought up on the parrot list
-        self.set_lineno(node)
+        self.append(self.set_lineno(node))
         eh = self.genlabel("except")
         final = self.genlabel("final")
         endtry = self.genlabel("endtry")
-        handler = self.gensym()
+        regtext, handler = self.gensym()
+        if regtext is not None:
+            self.append(regtext)        
         self.append("newsub %s, .Exception_Handler, %s" % (handler, eh))
         self.append("set_eh " + handler)
         self.visit(node.body)
         self.append("clear_eh")
         prev_exception = self.exception
-        self.exception = self.gensym()
+        regtext, self.exception = self.gensym()
+        if regtext is not None:
+            self.append(regtext)        
         self.append("new %s, 'PyNone'" % self.exception)
-        self.goto(final)
-        self.label(eh)
+        text, tf = self.goto(final)
+        self.append(text)
+        if not tf:
+            self.reachable = False
+        selflinesappend, selfappend, indent = self.label(eh)
+        if selflinesappend is not None:
+            self.lines.append(selflinesappend)
+        if selfappend is not None:
+            self.append(selfappend, indent)        
+        #self.goto(final)
+        #self.label(eh)
         self.append("%s = P5" % self.exception)
-        self.label(final)
+        selflinesappend, selfappend, indent = self.label(final)
+        if selflinesappend is not None:
+            self.lines.append(selflinesappend)
+        if selfappend is not None:
+            self.append(selfappend, indent)        
+        #self.label(final)
         self.visit(node.final) 
-        self.unless(self.exception, endtry)
+        self.append(self.unless(self.exception, endtry))
         self.append("rethrow %s" % self.exception)
-        self.label(endtry)
+        selflinesappend, selfappend, indent = self.label(endtry)
+        if selflinesappend is not None:
+            self.lines.append(selflinesappend)
+        if selfappend is not None:
+            self.append(selfappend, indent)        
+        #self.label(endtry)
         self.exception=prev_exception
 
 
     def visitClass(self, node):
         name = node.name
-        klass = self.gensym()
+        regtext, klass = self.gensym()
+        if regtext is not None:
+            self.append(regtext)        
         
         if len(node.bases):
             assert len(node.bases) == 1, "Multiple bases not supported yet"
             super = self.compileExpression(node.bases[0])
         else:
-            super = self.gensym()
+            regtext, super = self.gensym()
+            if regtext is not None:
+                self.append(regtext)            
             self.append("getclass %s, 'PyType'" % super)
 
         self.append("subclass %s, %s, '%s'" % (klass, super, name))
@@ -1238,6 +1516,7 @@ class PirateSubVisitor(PirateVisitor):
         return res + "\n\n".join([s.getCode() for s in self.subs])
 
     def getCodeForFunction(self):
+        #print self
         code = self.lines
         self.lines = imclist()
         fallthru = self.reachable
@@ -1256,10 +1535,18 @@ class PirateSubVisitor(PirateVisitor):
 
         if self.emptyReturn:
             fallthru = True
-            self.label(self.emptyReturn, optional=True)
+            selflinesappend, selfappend, indent = self.label(self.emptyReturn, optional=True)
+            if selflinesappend is not None:
+                self.lines.append(selflinesappend)
+            if selfappend is not None:
+                self.append(selfappend, indent)
+                
+#            self.label(self.emptyReturn, optional=True)
 
         if fallthru:
-            dest = self.gensym()
+            regtext, dest = self.gensym()
+            if regtext is not None:
+                self.append(regtext)            
             self.append("new %s, %s" % (dest,self.find_type("PyNone")))
             self.append(".return (%s)" % dest)
         self.append(".end", indent=False)
@@ -1272,8 +1559,12 @@ class PirateSubVisitor(PirateVisitor):
         fallthru = self.reachable
         self.reachable = True
         
-        gen = self.gensym()
-        result = self.gensym()
+        regtext, gen = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
+        regtext, result = self.gensym()
+        if regtext is not None:
+            self.append(regtext)
 
         name = self.name
         if self.doc:
@@ -1290,14 +1581,24 @@ class PirateSubVisitor(PirateVisitor):
         self.append("setprop %s, 'next', %s" % (result,gen))
 
         self.append(".return (%s)" % result)
-        self.label(label)
+        selflinesappend, selfappend, indent = self.label(label)
+        if selflinesappend is not None:
+            self.lines.append(selflinesappend)
+        if selfappend is not None:
+            self.append(selfappend, indent)
+#        self.label(label)
         self.append("new_pad -1")
 
         self.lines.extend(code)
 
         if self.emptyReturn:
             fallthru = True
-            self.label(self.emptyReturn, optional=True)
+            selflinesappend, selfappend, indent = self.label(self.emptyReturn, optional=True)
+            if selflinesappend is not None:
+                self.lines.append(selflinesappend)
+            if selfappend is not None:
+                self.append(selfappend, indent)            
+#            self.label(self.emptyReturn, optional=True)
 
         if fallthru:
             stop = ast.Raise(ast.Const("StopIteration"), None, None)
@@ -1314,7 +1615,11 @@ class PirateSubVisitor(PirateVisitor):
     def visitReturn(self, node):
         if isinstance(node.value,ast.Const) and node.value.value == None:
             self.emptyReturn = self.genlabel("return")
-            self.goto(self.emptyReturn)
+            text, tf = self.goto(self.emptyReturn)
+            self.append(text)
+            if not tf:
+                self.reachable = False
+#            self.goto(self.emptyReturn)
         else:
             result = self.compileExpression(node.value, allocate=1)
             self.append("pop_pad")
@@ -1334,16 +1639,24 @@ class PassEmitter(ast.Pass):
 class WhileEmitter(ast.While):
     def emit(self):
         a = PirateVisitor("__main__")
-        print "hmm234932478723t4823g"
-        yield "test"
-        yield "test2"
-        yield a.set_lineno(self)
-        yield "test3"        
-        yield Dispatch(self.body).getLines()
-        yield "test4"        
+        yield beautify("hmm234932478723t4823g", 1)
+        yield beautify("test")
+        yield beautify("test2")
+        #yield a.set_lineno(self)
+        yield beautify("test3")        
+        yield beautify(Dispatch(self.body).getLines())
+        yield beautify("test4",2)        
         
-'''
-        self.set_lineno(node)
+def beautify(arg, val = 0):
+    if val == 0:
+        return "    " + str(arg) + "\n"
+    elif val == 2:
+        return "    " + str(arg)
+    else:
+        return str(arg) + "\n"
+
+"""
+        self.append(self.set_lineno(node))
         _while = self.genlabel("while")
         _elsewhile = self.genlabel("elsewhile") # sync nums even if no "else"
         _endwhile = self.genlabel("endwhile")
@@ -1364,17 +1677,20 @@ class WhileEmitter(ast.While):
         self.label(_endwhile, optional=True)
         self.loops.pop()
 
-'''
+"""
 ###############################################                
 ## module interface ###############################################
+pir = PirateVisitor("__main__")
+instanceList = []
+initialRun = 1
     
 import time
 import transform
 #import emitters
 HEAD=\
-'''
+"""
 # generated by pirate on %s
-''' % time.asctime()
+""" % time.asctime()
 FOOT=""
 
 def replaceWith(newClass):
@@ -1400,17 +1716,28 @@ def simplify(ast):
 
 def Dispatch(ast):
     vis = compiler.visitor.ASTVisitor()
-    pir = PirateVisitor("__main__")
-    vis.preorder(ast, pir)
-    if isinstance(ast, compiler.ast.Module):
-            pre  = ["    loadlib P1, 'python_group'",
-                    "    push_eh __py_catch"]
-            post = ["    .return ()",
-                    "__py_catch:",
-                    "    print_item P5",
-                    '    print_newline']
-            pir.lines = pre + ["#"] + pir.lines + ["#"] + post
-    return pir
+    global initialRun
+    if initialRun:
+        initialRun = 0
+        #pir = PirateVisitor("__main__")
+        global pir
+        vis.preorder(ast, pir)
+        if isinstance(ast, compiler.ast.Module):
+                pre  = ["    loadlib P1, 'python_group'",
+                        "    push_eh __py_catch"]
+                post = ["    .return ()",
+                        "__py_catch:",
+                        "    print_item P5",
+                        '    print_newline']
+                pir.lines = pre + ["#"] + pir.lines + ["#"] + post
+        return pir
+    else:
+        initialRun = 0
+        inst = PirateVisitor("__main__")
+        global instanceList
+        instanceList.append(inst)
+        vis.preorder(ast, inst)
+        return inst
                     
 def compile(ast, name="__main__"):
     return Dispatch(simplify(ast)).getCode()
@@ -1452,4 +1779,4 @@ if __name__=="__main__":
         print __doc__
         sys.exit()
         
-#SETH 
+
