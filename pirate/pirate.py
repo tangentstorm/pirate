@@ -137,8 +137,8 @@ class PirateVisitor(object):
         return self.flatten(self.lines)                
 
     def getCode(self):
-        res  = ".sub %s @MAIN\n" % self.name
-        res += "    new_pad 0\n"
+	res  = ".sub %s :main\n" % self.name
+        #res += "    new_pad 0\n"
         res += "\n".join(self.getLines()) + "\n"#list(self.getLines())) + "\n"
         res += ".end\n"
         res += "\n\n".join([s.getCode() for s in self.subs]) + "\n"
@@ -212,9 +212,9 @@ class PirateVisitor(object):
 
     def bindLocal(self, name, value):
         self.locals[name] = value
-        return "store_lex -1, '%s', %s" % (name, value)
+	return "store_global '%s', %s" % (name, value) # XXX: should be store_lex
     def bindGlobal(self, name, value):
-        return "store_lex  0, '%s', %s" % (name, value)
+        return "store_global '%s', %s" % (name, value)
 
     def lookupName(self, name):
         text = ""
@@ -231,8 +231,8 @@ class PirateVisitor(object):
             regtext, dest = self.gensym()
             if regtext is not None:
                 self.append(regtext)
-            text = "find_lex %s, '%s'" % (dest, name)    
-            #self.append("find_lex %s, '%s'" % (dest, name))
+	    text = "find_global %s, '%s'" % (dest,name) # XXX: should be find_lex
+	   #self.append("find_lex %s, '%s'" % (dest, name))
             self.locals[name] = dest
         return dest, text
     ##[ expression compiler ]######################################
@@ -840,13 +840,16 @@ class PirateVisitor(object):
 
         # store the address in dest
         self.append("new %s, %s" % (ref, self.find_type("PyFunc")))
-        self.append("set_addr %s, %s" % (ref, sub))
+        #self.append("set_addr %s, %s" % (ref, sub))
+	self.append("find_global %s, '%s'" % (ref, sub))
         if isLambda: 
             self.append("set %s, '<lambda>'" % ref)
         elif name: 
             self.append("set %s, '%s'" % (ref, name))
-        for (i, arg) in enumerate(node.argnames):
-            self.append("%s[%s] = '%s'" % (ref, i, arg))
+	# FIXME: took this out for now because pmc couldn't handle it
+	# need to implement set_string in pyfunc.pmc I believe
+        #for (i, arg) in enumerate(node.argnames):
+        #    self.append("%s[%s] = '%s'" % (ref, i, arg))
 
         if node.defaults:
             regtext, defaults = self.gensym()
@@ -1093,7 +1096,7 @@ class PirateVisitor(object):
             if regtext is not None:
                 self.append(regtext)            
             name = node.name
-            self.append("peek_pad " + pad)
+            #self.append("peek_pad " + pad)
             self.append("delete %s['%s']" % (pad, name))
             if name in self.locals: del self.locals[name]
         elif node.flags=="OP_ASSIGN":
@@ -1428,9 +1431,11 @@ class PirateVisitor(object):
         endtry = self.genlabel("endtry")
         regtext, handler = self.gensym()
         if regtext is not None:
-            self.append(regtext)        
-        self.append("newsub %s, .Exception_Handler, %s" % (handler, eh))
-        self.append("set_eh " + handler)
+            self.append(regtext)
+	# XXX: Does this work the same?
+        #self.append("newsub %s, .Exception_Handler, %s" % (handler, eh))
+        #self.append("set_eh " + handler)
+	self.append("push_eh %s" % eh)
         self.visit(node.body)
         self.append("clear_eh")
         prev_exception = self.exception
@@ -1502,7 +1507,8 @@ class PirateSubVisitor(PirateVisitor):
         self.doc = doc
         self.args = args
         for (i,arg) in enumerate(self.args):
-            self.locals[arg] = "P%d" % (i+5)
+	    self.locals[arg] = arg
+            #self.locals[arg] = "P%d" % (i+5)
         self.depth = depth
         self.globals = []
         self.isGenerator = 0
@@ -1526,10 +1532,18 @@ class PirateSubVisitor(PirateVisitor):
             self.append("")
             self.append("# %s" % self.doc, indent=False)
         
-        self.append(".sub %s @ANON" % self.name, indent=False)
-        self.append("new_pad %s" % self.depth) #@TODO: use -1 here??
+	# had :anon but took of when changed from set_addr to find_global to look
+	# up functions
+	self.append(".sub %s" % self.name, indent=False)
+        #self.append("new_pad %s" % self.depth) #@TODO: use -1 here??
         for (i,arg) in enumerate(self.args):
-            self.append(self.bindLocal(arg, "P%d" % (i+5)))
+	    # get parameters
+            self.append(".param pmc %s" % arg)
+	# do local bindings after params. params must be at top
+	for(i,arg) in enumerate(self.args):
+	    # bind them to local namespace
+	    self.append(self.bindLocal(arg, arg))
+	    #self.append(self.bindLocal(arg, "P%d" % (i+5)))
 
         self.lines.extend(code)
 
@@ -1570,12 +1584,14 @@ class PirateSubVisitor(PirateVisitor):
         if self.doc:
             self.append("")
             self.append("# %s" % self.doc, indent=False)
-
-        self.append(".sub \"%s\" @ANON" % name, indent=False)
+        # had an :anon I removed it so could find by find_global
+	self.append(".sub \"%s\"" % name, indent=False)
         for (i,arg) in enumerate(self.args):
             self.append(self.bindLocal(arg, "P%d" % (i+5)))
 
         label = self.genlabel("gen")
+	#self.append("new %s, .Coroutine" % gen)
+	#self.append("set_addr %s, %s" % (gen, label))
         self.append("newsub %s, .Coroutine, %s" % (gen,label))
         self.append("new %s, %s" % (result,self.find_type("PyGen")))
         self.append("setprop %s, 'next', %s" % (result,gen))
@@ -1587,7 +1603,7 @@ class PirateSubVisitor(PirateVisitor):
         if selfappend is not None:
             self.append(selfappend, indent)
 #        self.label(label)
-        self.append("new_pad -1")
+        #self.append("new_pad -1")
 
         self.lines.extend(code)
 
@@ -1622,7 +1638,7 @@ class PirateSubVisitor(PirateVisitor):
 #            self.goto(self.emptyReturn)
         else:
             result = self.compileExpression(node.value, allocate=1)
-            self.append("pop_pad")
+         #   self.append("pop_pad")
             self.append(".return (" + result + ")")
             self.reachable = False
 
@@ -1690,6 +1706,7 @@ import transform
 HEAD=\
 """
 # generated by pirate on %s
+.HLL 'Python', 'python_group'
 """ % time.asctime()
 FOOT=""
 
@@ -1723,11 +1740,12 @@ def Dispatch(ast):
         global pir
         vis.preorder(ast, pir)
         if isinstance(ast, compiler.ast.Module):
-                pre  = ["    loadlib P1, 'python_group'",
+                pre  = ["    #loadlib P1, 'python_group'",
                         "    push_eh __py_catch"]
                 post = ["    .return ()",
                         "__py_catch:",
-                        "    print_item P5",
+			"    get_results '(0,0)', P0, S0",
+                        "    print_item S0",
                         '    print_newline']
                 pir.lines = pre + ["#"] + pir.lines + ["#"] + post
         return pir
