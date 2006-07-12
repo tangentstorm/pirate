@@ -1,0 +1,8 @@
+Finish enabling(fixing) rest of current PMCs:
+	pybuiltin and pyclass the most work I believe
+Figure out how will do lexical vars: (some notes in NOTES on this)
+	Use parrot LexPad/LexInfo:
+		need to decalare lexicals with .lex
+	Use modified LexPad:
+		make so can store lexical with out prior existence(store_lex)
+		but should not beable to find_lex without prior existance(like LexPad)
