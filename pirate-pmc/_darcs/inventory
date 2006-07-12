@@ -1,0 +1,28 @@
+[Initial revision.
+Tyler Coumbes <coumbes@gmail.com>**20060531152550] 
+[PMCs compile and can be used by parrot with 0.4.4 The journey has just begun :)
+Tyler Coumbes <coumbes@gmail.com>**20060531170325] 
+[change Parrot_PMC_typenum to pmc_type in pybuiltin.pmc
+Tyler Coumbes <coumbes@gmail.com>**20060601174714] 
+[enable more of play.pir
+Tyler Coumbes <coumbes@gmail.com>**20060601174832] 
+[enable morph in pyobject.pmc
+Tyler Coumbes <coumbes@gmail.com>**20060601184601] 
+[Enable more features
+Tyler Coumbes <coumbes@gmail.com>**20060601200613] 
+[Enable get_class and iter in pystring.pmc
+Tyler Coumbes <coumbes@gmail.com>**20060603054132] 
+[Fixed get_repr in pystring.pmc(wasn't assigning return of string_append to repr)
+Tyler Coumbes <coumbes@gmail.com>**20060603061500] 
+[Enable __cmp__ in pyobject.pmc
+Tyler Coumbes <coumbes@gmail.com>**20060603101753] 
+[Prepare t/pmc tests to be used again
+Tyler Coumbes <coumbes@gmail.com>**20060604105902] 
+[Add remove *.bundle on clean for MacOs X
+Tyler Coumbes <coumbes@gmail.com>**20060604110152] 
+[Add NOTES and TODO files
+Tyler Coumbes <coumbes@gmail.com>**20060604110217] 
+[Changes by audreyt to svn
+Tyler Coumbes <coumbes@gmail.com>**20060606125933] 
+[chips changes to pie-thon.pl
+Tyler Coumbes <coumbes@gmail.com>**20060708112308] 
