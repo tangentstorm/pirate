@@ -1,0 +1,4 @@
+(class foo (object)
+  "an object"
+  (def bar (self a b)
+      (+ a b)))
