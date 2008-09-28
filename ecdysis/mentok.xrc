@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="cp1252"?>
+<resource>
+  <object class="wxFrame" name="MentokFrame">
+    <title>Mentok The MindTrainer</title>
+    <object class="wxPanel" name="mypanel"/>
+  </object>
+</resource>
