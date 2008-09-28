@@ -1,0 +1,36 @@
+expr
+ 0  . expr
+ 1 -- . list
+ 2      . id  < class > 
+ 2      . id  < foo > 
+ 2 ---- . list
+ 3        . id  < object > 
+ 2      . string  < an object > 
+ 2 ---- . list
+ 3        . id  < def > 
+ 3        . id  < bar > 
+ 3 ------ . list
+ 4          . id  < self > 
+ 4          . id  < a > 
+ 4          . id  < b > 
+ 3 ------ . list
+ 4          . operator  < + > 
+ 4          . id  < a > 
+ 4          . id  < b > 
+
+[<AST id : class >,
+ <AST id : foo >,
+ <AST list : None >,
+ <AST string : an object >,
+ <AST list : None >]
+Class('foo', [Name('object')], 'an object', Stmt([Function(None, 'bar', ['self', 'a', 'b'], [], 0, None, Stmt([Return(CallFunc(Name('lispplus'), [Name('a'), Name('b')], None, None))]))]))
+------------
+[<AST id : class >,
+ <AST id : foo >,
+ <AST list : None >,
+ <AST string : an object >,
+ <AST list : None >]
+Class('foo', [Name('object')], 'an object', Stmt([Function(None, 'bar', ['self', 'a', 'b'], [], 0, None, Stmt([Return(CallFunc(Name('lispplus'), [Name('a'), Name('b')], None, None))]))]))
+------------
+Module(None, Stmt([Class('foo', [Name('object')], 'an object', Stmt([Function(None, 'bar', ['self', 'a', 'b'], [], 0, None, Stmt([Return(CallFunc(Name('lispplus'), [Name('a'), Name('b')], None, None))]))]))]))
+
