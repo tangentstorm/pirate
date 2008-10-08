@@ -1,0 +1,321 @@
+<?xml version="1.0"?>
+<!DOCTYPE spec [
+  <!ENTITY title "The Python compiler Module">
+]>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <title>&title;</title>
+  <link rel="stylesheet" href="xhtml.css"/>
+</head>
+<body>
+  
+<h1>&title;</h1>
+
+
+
+
+<p>When a parser gobbles up a source file, it creates a data structure
+called an <a href="http://en.wikipedia.org/wiki/Abstract_syntax_tree">abstract
+syntax tree</a></p>
+
+<p>The most famous modern example of an AST is probably the Document
+Object Model (DOM), which represents the abstract syntax tree for XML
+and HTML.  By using the DOM, web developers can build and transform
+web pages or other documents on the fly.</p>
+
+<p>Software compilers like python also create ASTs, and they can be
+manipulated programatically, just like the DOM. The python
+<code>compiler</code> module provides tools for building,
+transforming, and compiling python abstract syntax trees.</p>
+
+<p>So what good is a python AST? Well, you could use one to:</p>
+
+<ul>
+  <li>scan code for errors 
+  (like <a href="http://www.logilab.org/projects/pylint">pylint</a>)</li>
+  <li>mutate code in order to test your tests 
+  (like <a href="http://jester.sourceforge.net/">pester</a>)</li>
+  <li>refactor code automatically 
+  (like <a href="http://bicyclerepair.sourceforge.net/">bicycle 
+     repair man</a>)</li>
+</ul>
+
+<p>None of the tools mentioned above actually use the
+<code>compiler</code> module (which is still relatively new) but
+similar tools easily could. In my own work, I've used the
+<code>compiler</code> module to:</p>
+
+<ul>
+  <li>compile python into bytecode for the 
+    <a href="http://parrotcode.org/">parrot</a>
+    virtual machine (<a href="http://pirate.tangentcode.com/">pirate</a>)</li>
+  <li>provide an alternate lisp-like syntax for python 
+    (<a href="http://ecdysis.tangentcode.com/">ecdysis</a>)</li>
+</ul>
+
+<p>The documentation for the <code>compiler</code> module is pretty
+sparse, but here is a quick guide to get you started.</p>
+
+
+
+
+<h2>Creating a Concrete Syntax Tree From a String</h2>
+
+<p>Python's <em>concrete</em> syntax tree is exposed through the
+<code>parser</code> module. It's not a pretty, though:</p>
+
+<code lang="python-doctest"><![CDATA[
+    >>> import parser    # yuck!
+    >>> parser.suite("pass").tolist()
+    [257, [264, [265, [266, [271, [1, 'pass']]], [4, '']]], [0, '']]
+
+]]></code>
+
+<p>The numbers correspond to rules in the python grammar.  You can
+look up what they mean using the <code>symbol</code> module:</p>
+
+<code lang="python-doctest">
+<![CDATA[
+    >>> import symbol
+    >>> symbol.sym_name[257]
+    'file_input'
+
+]]></code>
+
+
+
+
+<h2>Creating an Abstract Syntax Tree From a String</h2>
+
+<p>As you can see, a concrete syntax tree is very low level tools, and
+not really fun to work with. Thankfully, sometime around version 2.0,
+python added the <code>compiler</code> module, which offers a much
+simpler <em>abstract</em> syntax tree. To create one, simply call
+<code>compiler.parse()</code>:</p>
+
+<code lang="python-doctest">
+<![CDATA[
+    >>> import compiler
+    >>> compiler.parse("pass")
+    Module(None, Stmt([Pass()]))
+
+]]></code>
+
+
+<h2>Compiling and Evaluating a String</h2>
+
+<p>Compiling directly from a string is easy. It works 
+just like the builtin compile() function.</p>
+
+<code lang="python-doctest">
+<![CDATA[
+    >>> # builtin version
+    >>> code = compile("print 'builtin'", "somefile", "exec")
+    >>> exec code
+    builtin
+
+    >>> # compiler module
+    >>> code = compiler.compile("print 'hello!'", "somefile", "exec")
+    >>> exec code
+    hello!
+
+    >>> help(compiler.compile)
+    Help on function compile in module compiler.pycodegen:
+    <BLANKLINE>
+    compile(source, filename, mode, flags=None, dont_inherit=None)
+        Replacement for builtin compile() function
+    <BLANKLINE>
+
+]]></code>
+
+<h3>arguments to compile() and compiler.compile()</h3>
+
+<dl>
+  <dt><code>source</code></dt>
+  <dd>Your source code string</dd>
+
+  <dt><code>filename</code></dt>
+  <dd>Use this to tell python which file the source code came from
+      (for tracebacks and such). The file does not have to exist.</dd>
+
+  <dt><code>mode</code></dt>
+  <dd>This can be one of the following:
+    <dl>
+      <dt>single</dt>
+      <dd>Use this to compile a single expression or block
+      (for example, at an interactive prompt)</dd>
+      
+      <dt>eval</dt>
+      <dd>Use this to evaluate an expression. As with the built-in
+      <code>eval()</code> function, the code must return a value (in
+      other words, no loops or control structures allowed)
+      </dd>
+      
+      <dt>exec</dt>
+      <dd>Use this to evaluate a suite of one or more python
+      statements for use with the built-in <code>exec</code>
+      statement.
+      </dd>
+    </dl>
+  </dd>
+</dl>
+
+
+
+<h2>Transforming the AST</h2>
+
+
+<p>Transforming the AST is just a matter of rearranging the nodes in
+the tree. The nodes are defined in the
+<a href="http://pydoc.org/2.4.1/compiler.ast.html">compiler.ast</a>
+module. Here's a simple example:
+</p>
+
+<code lang="python-doctest">
+<![CDATA[
+    >>> tree = compiler.parse("print 'hello'")
+    >>> tree
+    Module(None, Stmt([Printnl([Const('hello')], None)]))
+    >>> tree.node.nodes[0].nodes[0].value
+    'hello'
+
+    >>> # official interface:
+    >>> tree.getChildNodes()[0].getChildNodes()[0].getChildNodes()[0].value='changed'
+    >>> tree
+    Module(None, Stmt([Printnl([Const('changed')], None)]))
+
+    >>> # undocumented, simpler interface:
+    >>> tree.node.nodes[0].nodes[0].value = "transformed!"
+    >>> tree
+    Module(None, Stmt([Printnl([Const('transformed!')], None)]))
+
+
+]]></code>
+
+
+<h2>Compiling and Evaluating an AST</h2>
+
+<p>Since we're starting with an AST instead of a string, we
+need to move past the <code>compile()</code> function and use a
+<code>CodeGenerator</code> instance instead. There are
+several of these defined:</p>
+
+
+<code lang="python-doctest">
+<![CDATA[
+    >>> from compiler import pycodegen
+    >>> for name in dir(pycodegen):
+    ...     if name.endswith("CodeGenerator"):
+    ...         print name
+    ... 
+    ClassCodeGenerator
+    CodeGenerator
+    ExpressionCodeGenerator
+    FunctionCodeGenerator
+    InteractiveCodeGenerator
+    ModuleCodeGenerator
+
+]]></code>
+
+
+<p>If you dig through <code>compiler.pycodegen</code>,
+you'll see the three modes get mapped up like so:</p>
+
+<dl>
+  <dt>single</dt>
+  <dd><code>InteractiveCodeGenerator</code></dd>
+
+  <dt>eval</dt>
+  <dd><code>ExpressionCodeGenerator</code></dd>
+
+  <dt>exec</dt>
+  <dd><code>ModuleCodeGenerator</code></dd>
+</dl>
+
+
+
+<p>These classes expect the filename to be on the root node of the
+AST, so add a <code>.filename</code> attribute before you instantiate
+the <code>CodeGenerator</code>. Then call the <code>getCode()</code>
+method to compile:</p>
+
+<code lang="python-doctest">
+<![CDATA[
+    >>> tree
+    Module(None, Stmt([Printnl([Const('transformed!')], None)]))
+
+    >>> tree.filename = ""
+    >>> gen = pycodegen.ModuleCodeGenerator(tree)
+    >>> code = gen.getCode()
+    >>> exec code
+    transformed!
+
+]]></code>
+
+<h2>Creating an AST Programatically</h2>
+
+<p>You don't need a parser to build an AST. You can
+create one yourself.</p>
+
+<code lang="python-doctest">
+<![CDATA[
+    >>> from compiler import ast
+
+    >>> # start with a module node:
+    >>> root = node = ast.Module("example", node=[])
+
+    >>> # add a statement holder:
+    >>> next = ast.Stmt(nodes=[])
+    >>> node.node = next
+    >>> root
+    Module('example', Stmt([]))
+
+    >>> # create the actual statement:
+    >>> node = next
+    >>> next = ast.Printnl(nodes=[], dest=None)   # print >> None
+    >>> node.nodes.append(next)
+    >>> node = next
+    >>> next = ast.Const("look ma! no parser!")
+    >>> node.nodes.append(next)
+    >>> root
+    Module('example', Stmt([Printnl([Const('look ma! no parser!')], None)]))
+
+    >>> # now you can run it:
+    >>> root.filename = "example"
+    >>> exec pycodegen.ModuleCodeGenerator(root).getCode()
+    look ma! no parser!
+
+]]></code>
+
+
+<h2>more info</h2>
+
+
+<h3>walking the tree</h3>
+
+<p>The <code>ast.visitor</code> module provides classes for walking
+the tree. Consult the source code or download <a
+href="http://pirate.tangentcode.com/">pirate</a> for an extensive
+example.
+</p>
+
+
+<h3>general advice</h3>
+
+<p>The <code>compiler.ast</code> module is generated programatically,
+but the code is very readable, and it's easy to pick out the classes
+you want. The best way to see how an AST <em>should</em> look is to
+just run <code>compiler.parser()</code> on some code and see what it
+comes up with.</p>
+
+
+<p>The official <a
+href="http://docs.python.org/lib/compiler.html">official docs</a> are
+somewhat short, but you might be able to find more information through
+the <a href="http://www.python.org/sigs/compiler-sig/">compiler
+SIG</a> mailing list.
+</p>
+
+
+</body>
+</html>

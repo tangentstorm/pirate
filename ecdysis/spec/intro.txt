@@ -1,0 +1,20 @@
+
+h1. ecdysis : transcendental python
+
+
+the word ecdysis means shedding skin.
+ecdysis is python without the syntax.
+
+
+h2. a simple example.
+
+
+   #>>> from ecdysis import eeval
+   #>>> eeval("(+ 1 2)")
+   #3
+
+
+   #>>> f = eeval("(lam (a b) (+ a b))")
+   #>>> f(5, 3)
+   #8
+
